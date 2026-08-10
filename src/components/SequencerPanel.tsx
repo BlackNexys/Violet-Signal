@@ -14,6 +14,7 @@ import {
   PATTERN_IDS,
   chordSuggestions,
   getActivePattern,
+  stepsPerBeat,
   type AutomationTarget,
   type NoteLane,
   type StepLane,
@@ -21,8 +22,6 @@ import {
 import { useAppStore } from '../state/store'
 
 const shortNotes = (notes: string[]) => notes.length ? `${notes[0].replace(/-?\d/, '')}${notes.length > 1 ? `+${notes.length - 1}` : ''}` : '·'
-const subdivisions = ['1', 'e', '&', 'a']
-
 const automationBounds: Record<AutomationTarget, { min: number; max: number; step: number; label: string }> = {
   mask: { min: 80, max: 12000, step: 10, label: 'Filter cutoff' },
   memory: { min: 0, max: 1, step: 0.01, label: 'Delay amount' },
@@ -54,8 +53,17 @@ export function SequencerPanel() {
   const removeArrangementPattern = useAppStore((state) => state.removeArrangementPattern)
   const clearArrangement = useAppStore((state) => state.clearArrangement)
   const setAutomationPoint = useAppStore((state) => state.setAutomationPoint)
+  const setStepExpression = useAppStore((state) => state.setStepExpression)
   const pattern = getActivePattern(composition)
-  const selected = pattern.steps[selectedStep]
+  const inspectedStep = Math.min(selectedStep, pattern.steps.length - 1)
+  const selected = pattern.steps[inspectedStep]
+  const beatSize = stepsPerBeat(composition.meter)
+  const subdivisions = beatSize === 2 ? ['1', '&'] : ['1', 'e', '&', 'a']
+  const beatCount = Math.ceil(pattern.steps.length / beatSize)
+  const beatsPerBar = Number(composition.meter.split('/')[0])
+  const beatLabel = (beat: number) => beatCount > beatsPerBar ? `Bar ${Math.floor(beat / beatsPerBar) + 1} · ${beat % beatsPerBar + 1}` : `Beat ${beat + 1}`
+  const gridMinWidth = Math.max(686, 82 + pattern.steps.length * 38)
+  const gridStyle = { '--step-count': pattern.steps.length, '--grid-min-width': `${gridMinWidth}px` } as React.CSSProperties
   const suggestions = chordSuggestions(composition)
   const automation = pattern.automation[automationTarget]
   const automationConfig = automationBounds[automationTarget]
@@ -104,24 +112,24 @@ export function SequencerPanel() {
         <button type="button" className="arrangement-clear" title="Start arrangement with the active pattern" onClick={clearArrangement}><RotateCcw size={12} /></button>
       </div>
 
-      <div className="sequencer-scroll" tabIndex={0} aria-label="16-step sequencer; four subdivisions per beat">
-        <div className="beat-ruler" aria-hidden="true">
+      <div className="sequencer-scroll" tabIndex={0} aria-label={`${pattern.steps.length}-step sequencer; ${composition.meter} meter`}>
+        <div className="beat-ruler" style={{ minWidth: gridMinWidth, gridTemplateColumns: `78px repeat(${beatCount}, 1fr)` }} aria-hidden="true">
           <span />
-          {[1, 2, 3, 4].map((beat) => <strong key={beat}>Beat {beat}</strong>)}
+          {Array.from({ length: beatCount }, (_, beat) => <strong key={beat}>{beatLabel(beat)}</strong>)}
         </div>
-        <div className="sequencer-grid sequencer-grid--expanded">
+        <div className="sequencer-grid sequencer-grid--expanded" style={gridStyle}>
           <div className="lane-label lane-label--header">Step</div>
           {pattern.steps.map((_, index) => (
-            <div key={`step-${index}`} className={`step-number${activeStep === index && playingPatternId === pattern.id ? ' is-current' : ''}${selectedStep === index ? ' is-selected' : ''}`}>
-              <span>{subdivisions[index % 4]}</span><small>{String(index + 1).padStart(2, '0')}</small><i />
+            <div key={`step-${index}`} className={`step-number${index % beatSize === 0 ? ' is-beat-start' : ''}${activeStep === index && playingPatternId === pattern.id ? ' is-current' : ''}${inspectedStep === index ? ' is-selected' : ''}`}>
+              <span>{subdivisions[index % beatSize]}</span><small>{String(index + 1).padStart(2, '0')}</small><i />
             </div>
           ))}
 
           <div className="lane-label"><span>Chords</span><small>Poly voice</small></div>
           {pattern.steps.map((step, index) => (
             <button type="button" key={`notes-${index}`}
-              className={`step-cell note-cell${step.notes.length ? ' is-active' : ''}${activeStep === index && playingPatternId === pattern.id ? ' is-current' : ''}${selectedStep === index && selectedLane === 'notes' ? ' is-selected' : ''}`}
-              aria-label={`Step ${index + 1} chord: ${step.notes.join(', ') || 'silent'}`} aria-pressed={selectedStep === index && selectedLane === 'notes'}
+              className={`step-cell note-cell${step.notes.length ? ' is-active' : ''}${activeStep === index && playingPatternId === pattern.id ? ' is-current' : ''}${inspectedStep === index && selectedLane === 'notes' ? ' is-selected' : ''}`}
+              aria-label={`Step ${index + 1} chord: ${step.notes.join(', ') || 'silent'}`} aria-pressed={inspectedStep === index && selectedLane === 'notes'}
               onClick={() => selectLane(index, 'notes')}>
               <span>{shortNotes(step.notes)}</span>{step.notes.length > 0 && step.chordLength > 1 && <small>{step.chordLength}</small>}
             </button>
@@ -130,8 +138,8 @@ export function SequencerPanel() {
           <div className="lane-label"><span>Bass</span><small>Mono voice</small></div>
           {pattern.steps.map((step, index) => (
             <button type="button" key={`bass-${index}`}
-              className={`step-cell bass-cell${step.bass ? ' is-active' : ''}${activeStep === index && playingPatternId === pattern.id ? ' is-current' : ''}${selectedStep === index && selectedLane === 'bass' ? ' is-selected' : ''}`}
-              aria-label={`Step ${index + 1} bass: ${step.bass ?? 'silent'}`} aria-pressed={selectedStep === index && selectedLane === 'bass'}
+              className={`step-cell bass-cell${step.bass ? ' is-active' : ''}${activeStep === index && playingPatternId === pattern.id ? ' is-current' : ''}${inspectedStep === index && selectedLane === 'bass' ? ' is-selected' : ''}`}
+              aria-label={`Step ${index + 1} bass: ${step.bass ?? 'silent'}`} aria-pressed={inspectedStep === index && selectedLane === 'bass'}
               onClick={() => selectLane(index, 'bass')}>
               <span>{step.bass?.replace(/-?\d/, '') ?? '·'}</span>{step.bass && step.bassLength > 1 && <small>{step.bassLength}</small>}
             </button>
@@ -140,7 +148,7 @@ export function SequencerPanel() {
           <div className="lane-label"><span>Pulse</span><small>Percussion</small></div>
           {pattern.steps.map((step, index) => (
             <button type="button" key={`drum-${index}`}
-              className={`step-cell drum-cell${step.drum ? ' is-active' : ''}${activeStep === index && playingPatternId === pattern.id ? ' is-current' : ''}${selectedStep === index && selectedLane === 'drum' ? ' is-selected' : ''}`}
+              className={`step-cell drum-cell${step.drum ? ' is-active' : ''}${activeStep === index && playingPatternId === pattern.id ? ' is-current' : ''}${inspectedStep === index && selectedLane === 'drum' ? ' is-selected' : ''}`}
               aria-label={`Step ${index + 1} percussion: ${step.drum ? 'hit' : 'silent'}`} aria-pressed={step.drum}
               onClick={() => toggleAndSelect(index, 'drum')}><i /></button>
           ))}
@@ -148,7 +156,7 @@ export function SequencerPanel() {
           <div className="lane-label"><span>Texture</span><small>Noise voice</small></div>
           {pattern.steps.map((step, index) => (
             <button type="button" key={`texture-${index}`}
-              className={`step-cell texture-cell${step.texture ? ' is-active' : ''}${activeStep === index && playingPatternId === pattern.id ? ' is-current' : ''}${selectedStep === index && selectedLane === 'texture' ? ' is-selected' : ''}`}
+              className={`step-cell texture-cell${step.texture ? ' is-active' : ''}${activeStep === index && playingPatternId === pattern.id ? ' is-current' : ''}${inspectedStep === index && selectedLane === 'texture' ? ' is-selected' : ''}`}
               aria-label={`Step ${index + 1} texture: ${step.texture ? 'active' : 'silent'}`} aria-pressed={step.texture}
               onClick={() => toggleAndSelect(index, 'texture')}><Sparkles size={10} /></button>
           ))}
@@ -165,11 +173,11 @@ export function SequencerPanel() {
 
       <div className="step-inspector">
         <div className="step-inspector__heading">
-          <div><span className="eyebrow">Selected location</span><strong>Beat {Math.floor(selectedStep / 4) + 1} · {subdivisions[selectedStep % 4]} <small>step {String(selectedStep + 1).padStart(2, '0')}</small></strong></div>
+          <div><span className="eyebrow">Selected location</span><strong>{beatLabel(Math.floor(inspectedStep / beatSize))} · {subdivisions[inspectedStep % beatSize]} <small>step {String(inspectedStep + 1).padStart(2, '0')} · {composition.meter}</small></strong></div>
           <button type="button" className="clear-step" onClick={clearSelectedLane}><Trash2 size={12} /> Clear {selectedLane}</button>
         </div>
         <div className="lane-picker" aria-label="Step lane">
-          {(['notes', 'bass', 'drum', 'texture'] as StepLane[]).map((lane) => <button type="button" key={lane} className={selectedLane === lane ? 'is-active' : ''} onClick={() => selectStep(selectedStep, lane)}>{lane === 'notes' ? 'Chord' : lane === 'drum' ? 'Pulse' : lane}</button>)}
+          {(['notes', 'bass', 'drum', 'texture'] as StepLane[]).map((lane) => <button type="button" key={lane} className={selectedLane === lane ? 'is-active' : ''} onClick={() => selectStep(inspectedStep, lane)}>{lane === 'notes' ? 'Chord' : lane === 'drum' ? 'Pulse' : lane}</button>)}
         </div>
         {selectedLane === 'notes' && (
           <div className="note-assignment">
@@ -181,6 +189,11 @@ export function SequencerPanel() {
         {(selectedLane === 'notes' || selectedLane === 'bass') && (
           <label className="length-control">Length <select value={selectedLane === 'notes' ? selected.chordLength : selected.bassLength} onChange={(event) => setStepLength(selectedLane as NoteLane, Number(event.target.value))}>{[1, 2, 3, 4, 8].map((length) => <option key={length} value={length}>{length} step{length > 1 ? 's' : ''}</option>)}</select></label>
         )}
+        <div className="step-expression">
+          <label><span>Chance <output>{Math.round(selected.probability * 100)}%</output></span><input type="range" min={0} max={1} step={0.05} value={selected.probability} onChange={(event) => setStepExpression('probability', Number(event.target.value))} /></label>
+          <label><span>Ratchet</span><select value={selected.ratchets} onChange={(event) => setStepExpression('ratchets', Number(event.target.value))}>{[1, 2, 3, 4].map((count) => <option key={count} value={count}>{count} hit{count > 1 ? 's' : ''}</option>)}</select></label>
+          <label><span>Shift <output>{selected.microShift > 0 ? '+' : ''}{Math.round(selected.microShift * 100)}%</output></span><input type="range" min={-0.45} max={0.45} step={0.01} value={selected.microShift} onChange={(event) => setStepExpression('microShift', Number(event.target.value))} /></label>
+        </div>
       </div>
 
       <div className="automation-editor">
@@ -189,16 +202,16 @@ export function SequencerPanel() {
           <select value={automationTarget} onChange={(event) => setAutomationTarget(event.target.value as AutomationTarget)}>
             {(Object.keys(automationBounds) as AutomationTarget[]).map((target) => <option key={target} value={target}>{target} · {automationBounds[target].label}</option>)}
           </select>
-          <button type="button" disabled={automation[selectedStep] === null} onClick={() => setAutomationPoint(automationTarget, selectedStep, null)}>Clear point</button>
+          <button type="button" disabled={automation[inspectedStep] === null} onClick={() => setAutomationPoint(automationTarget, inspectedStep, null)}>Clear point</button>
         </div>
-        <div className="automation-lane">
+        <div className="automation-lane" style={{ '--step-count': automation.length } as React.CSSProperties}>
           {automation.map((value, index) => (
-            <button type="button" key={index} className={`${value !== null ? 'has-point' : ''}${selectedStep === index ? ' is-selected' : ''}`} onClick={() => { selectStep(index); if (value === null) setAutomationPoint(automationTarget, index, fallbackAutomation) }} aria-label={`${automationTarget} step ${index + 1}: ${value ?? 'no point'}`}>
+            <button type="button" key={index} className={`${value !== null ? 'has-point' : ''}${inspectedStep === index ? ' is-selected' : ''}`} onClick={() => { selectStep(index); if (value === null) setAutomationPoint(automationTarget, index, fallbackAutomation) }} aria-label={`${automationTarget} step ${index + 1}: ${value ?? 'no point'}`}>
               <i style={{ '--automation': value === null ? 0 : (value - automationConfig.min) / (automationConfig.max - automationConfig.min) } as React.CSSProperties} />
             </button>
           ))}
         </div>
-        <input type="range" min={automationConfig.min} max={automationConfig.max} step={automationConfig.step} value={automation[selectedStep] ?? fallbackAutomation} aria-label={`${automationTarget} at selected step`} onChange={(event) => setAutomationPoint(automationTarget, selectedStep, Number(event.target.value))} />
+        <input type="range" min={automationConfig.min} max={automationConfig.max} step={automationConfig.step} value={automation[inspectedStep] ?? fallbackAutomation} aria-label={`${automationTarget} at selected step`} onChange={(event) => setAutomationPoint(automationTarget, inspectedStep, Number(event.target.value))} />
       </div>
     </section>
   )

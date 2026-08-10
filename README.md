@@ -2,7 +2,7 @@
 
 Violet Signal is a beginner-friendly programmable browser instrument. One composition is projected as a playable synthesizer, a visual pattern/arrangement workspace, and safe declarative notation. Every view edits the same serializable model.
 
-This version expands the original one-bar MVP into a compact composition tool for a connected witch-house, darksynth, darkwave, and glitch soundverse while retaining its restrained Blacklight identity.
+This version expands the original one-bar MVP into a compact composition tool whose data-driven style system can move from ambient and synthpop through club, breakbeat, industrial, retro, dark electronic, experimental, and cinematic vocabularies while retaining its restrained Blacklight identity.
 
 The visual direction is defined in [`project-notes/blacklight-style-guide.md`](project-notes/blacklight-style-guide.md): a “haunted precision” system that translates the reference imagery into accessible interface color, type, hierarchy, state, material, and motion rules.
 
@@ -12,7 +12,9 @@ Use **Tutorial** for a seven-step guided walkthrough that points to the real tra
 
 Use **Cheatsheet** for a permanent quick reference covering beat subdivisions, sparse notation, keyboard controls, Blacklight synthesis terms, and project/capture behavior. Tutorial completion is stored locally and only removes the unread indicator.
 
-## Explore the soundverse
+## Explore and transform the soundverse
+
+Open **Style Lab** to browse 19 built-in recipes, filter them by musical family, blend a secondary influence, choose transformation strength, and explicitly preserve your notes, harmony, timing, arrangement, voices, effects, or tempo. Style application participates in undo/redo and queues safely to the selected boundary during playback. The architecture and extension contract are documented in [`project-notes/style-system.md`](project-notes/style-system.md).
 
 The headline scenes teach four different starting grammars:
 
@@ -53,18 +55,18 @@ npm run browser:smoke
 ### Write a phrase
 
 1. Select pattern A–D.
-2. Select a chord or bass cell in the 16-step grid.
+2. Select a chord or bass cell in the adaptive 8–64-step grid.
 3. Press the touch keys or computer keys `A S D F G H J K` to add or remove exact pitches.
 4. Use scale-aware chord suggestions for a quick voicing.
 5. Choose a note length of 1, 2, 3, 4, or 8 sixteenth-note steps.
 
-The sequencer groups its sixteen steps into four beats, each labeled `1 e & a`. Pulse and Texture cells toggle directly. Velocity cycles through three useful emphasis levels.
+The sequencer groups cells according to the selected meter. `/4` beats read `1 e & a`; `/8` beats read `1 &`. Pulse and Texture cells toggle directly. Velocity cycles through three useful emphasis levels, while per-step Chance, Ratchet, and Shift controls add deterministic variation and groove.
 
 ### Build an arrangement
 
 Four independent patterns can be copied, rotated, transposed, and appended to an arrangement of up to sixteen bars. The transport plays the arrangement in order and shows both the sounding pattern and current arrangement position.
 
-Chord, Bass, Pulse, and Texture voices each have their own waveform, filter, ADSR envelope, level, mute, and solo settings. Texture is procedurally generated noise; no remote samples are used.
+Chord, Bass, Pulse, and Texture voices each have their own waveform, selectable filter type, cutoff and resonance, detune, glide, ADSR envelope, level, mute, and solo settings. Texture is procedurally generated noise; no remote samples are used.
 
 ### Add motion and perform
 
@@ -88,8 +90,13 @@ For a complete human- and AI-oriented editing reference—including every accept
 
 ```text
 scene "Rain Behind Glass" {
-  world: darkwave
+  style: darkwave
+  style-version: 1
+  influences: ambient=0.15
   tempo: 76
+  meter: 4/4
+  steps: 16
+  swing: 0.035
   seed: 2407
   scale: C minor
   lock: on
@@ -125,7 +132,7 @@ The CodeMirror editor provides syntax coloring, suggestions, formatting, error-l
 
 ## Architecture
 
-- `src/model/` — serializable composition, patterns, steps, voices, automation, transformations, and starter scenes.
+- `src/model/` — serializable composition, patterns, steps, voices, automation, transformations, versioned style registry, and starter scenes.
 - `src/dsl/` — deterministic parser, sparse serializer, code highlighting ranges, and change summaries.
 - `src/state/` — Zustand actions, synchronization, bounded composition undo/redo, selection, recording, arrangement position, and quantized pending edits.
 - `src/audio/` — persistent Tone.js graph, Web Audio transport scheduling, frame-synchronized visual updates, shared seeded event/effect mappings, live recorder, and offline WAV rendering. See the [`timing model`](project-notes/timing.md) and [`live/offline rendering model`](project-notes/audio-rendering.md).
@@ -147,7 +154,7 @@ The audio graph is created only after a user gesture. Four voice-specific filter
 
 ## Current limitations
 
-- The musical architecture intentionally remains four voices, four patterns, and sixteen arrangement bars.
+- The musical architecture intentionally remains four voices, four editable patterns, and sixteen arrangement phrases; patterns can contain 8–64 steps.
 - Note lengths are gated durations rather than legato ties between changing pitches.
 - Offline WAV rendering includes deterministic Ghost/Humanize variation, step automation, and the shared effects graph. Temporary Pressure and Freeze Memory gestures require live capture.
 - Live recording format depends on the browser and is currently downloaded as WebM.
@@ -156,4 +163,4 @@ The audio graph is created only after a user gesture. Four voice-specific filter
 
 ## Next valuable milestone
 
-The next release should focus on expressive input rather than more tracks: MIDI and pointer-drag piano-roll entry, editable pattern names, interpolated automation curves, per-voice stem export, and a small in-product notation guide.
+The next release should focus on expressive input and extensibility: MIDI and pointer-drag piano-roll entry, editable pattern names, interpolated automation curves, per-voice stem export, and validated import/export for non-executable style packs.

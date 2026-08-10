@@ -4,7 +4,7 @@ Status: implemented 2026-08-10.
 
 ## Intent
 
-Violet Signal is oriented toward a connected dark-electronic soundverse: witch house, darksynth, darkwave, and glitch. These are starting grammars rather than rigid genre validators. A scene should demonstrate a few audible production decisions clearly enough that a beginner can borrow, combine, and rewrite them.
+Violet Signal's headline scenes are oriented toward a connected dark-electronic soundverse: witch house, darksynth, darkwave, and glitch. These remain starting grammars rather than rigid genre validators, while the broader registry now covers many synth traditions. See [`style-system.md`](style-system.md) for the extensible recipe architecture.
 
 Everything remains synthesized or procedurally generated in the browser. No remote or copyrighted samples are required.
 
@@ -47,7 +47,7 @@ Both controls are serializable, undoable, editable in Code, automatable per patt
 
 ```text
 scene "Veil Communion" {
-  world: witch-house
+  style: witch-house
   veil: 0.46
   fracture: 0.18
 
@@ -56,7 +56,7 @@ scene "Veil Communion" {
 }
 ```
 
-Known `world` values are `witch-house`, `darksynth`, `darkwave`, and `glitch`. The field is descriptive; it does not silently rewrite notes or controls.
+`style` accepts any id in the built-in registry. `world` remains a legacy alias. Editing the field directly is descriptive; applying a Style Lab recipe is the explicit operation that can transform musical settings.
 
 ## Beginner-facing rules
 
@@ -69,14 +69,14 @@ Known `world` values are `witch-house`, `darksynth`, `darkwave`, and `glitch`. T
 
 ## Data and compatibility
 
-Older local projects receive safe defaults when cloned or restored: darkwave as the descriptive world, low Veil, and no Fracture. Existing notes, voices, automation, and arrangements are preserved. Missing Veil or Fracture automation lanes are created as silent lanes.
+Older local projects receive safe defaults when cloned or restored: darkwave as the descriptive style, 4/4, sixteen steps, no Swing, low Veil, no Fracture, and conservative voice-expression values. Existing notes, voices, automation, and arrangements are preserved. Missing automation lanes are created as silent lanes.
 
 ## Maintenance
 
 When adding a new scene, verify that it:
 
 - round-trips through the DSL exactly;
-- names one supported sound world;
+- names one supported style;
 - differs musically, not only by title;
 - contains useful Veil and Fracture automation examples;
 - remains below the hard −1 dB limiter with its intended Overclock range;

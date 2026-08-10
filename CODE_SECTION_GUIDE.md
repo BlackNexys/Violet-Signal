@@ -26,8 +26,13 @@ A scene begins with a quoted name, contains `control: value` lines, and ends wit
 
 ```text
 scene "Your Scene Name" {
-  world: darkwave
+  style: darkwave
+  style-version: 1
+  influences: ambient=0.2
   tempo: 104
+  meter: 4/4
+  steps: 16
+  swing: 0.035
   seed: 712
   scale: C minor
   lock: on
@@ -43,7 +48,7 @@ Indentation is optional but recommended. Blank lines are allowed. Comments must 
 
 ## How steps map to beats
 
-Every pattern is one 4/4 bar divided into sixteen sixteenth-note steps.
+Every cell is a sixteenth note, but a pattern can contain `8`, `12`, `14`, `16`, `20`, `24`, `28`, `32`, or `64` cells. The meter controls how cells group into beats: `/4` meters use four cells per beat (`1 e & a`), while `/8` meters use two (`1 &`). A pattern may therefore represent one bar or a longer phrase.
 
 | Beat | Step numbers | Count |
 | --- | --- | --- |
@@ -52,14 +57,19 @@ Every pattern is one 4/4 bar divided into sixteen sixteenth-note steps.
 | 3 | `09 10 11 12` | `3 e & a` |
 | 4 | `13 14 15 16` | `4 e & a` |
 
-For example, steps `01 05 09 13` are the four quarter-note downbeats. Steps `03 07 11 15` are their offbeat eighth notes.
+For example, in 4/4 steps `01 05 09 13` are the four quarter-note downbeats. Steps `03 07 11 15` are their offbeat eighth notes. In 7/8, fourteen cells make seven eighth-note beats.
 
 ## Global configuration
 
 | Control | Accepted value | Meaning |
 | --- | --- | --- |
-| `world` | `witch-house`, `darksynth`, `darkwave`, or `glitch` | Descriptive sound-world identity. It does not overwrite the other controls. |
+| `style` | Any built-in style id | Primary production vocabulary. `world` remains accepted for older projects. |
+| `style-version` | Whole number `1`–`999` | Recipe schema version written by the app; normally leave it unchanged. |
+| `influences` | `style-id=0..0.8`, or `none` | Optional secondary style blend; the Style Lab currently writes one influence. |
 | `tempo` | `40`–`220` | Beats per minute. |
+| `meter` | `4/4`, `3/4`, `6/8`, `5/4`, or `7/8` | Beat grouping and transport emphasis. |
+| `steps` | `8`, `12`, `14`, `16`, `20`, `24`, `28`, `32`, or `64` | Number of cells in every pattern. Put this before event lines. |
+| `swing` | `0`–`0.75` | Delays alternating steps while keeping step 01 and the loop seam anchored. |
 | `seed` | Whole number `0`–`2147483647` | Makes Ghost and other chance behavior repeatable. |
 | `scale` | Root plus `minor` or `major`, such as `C minor` or `F# major` | Scale used by scale-aware visual tools. |
 | `lock` | `on` or `off` | Enables or disables scale locking in the visual instrument. |
@@ -77,17 +87,21 @@ WAV export reproduces the written gain staging and effects, then peak-normalizes
 There are four voices: `chords`, `bass`, `pulse`, and `texture`. A voice line begins with its waveform and then uses space-separated `setting=value` tokens.
 
 ```text
-voice chords: triangle volume=-10 cutoff=2600 attack=0.08 decay=0.5 sustain=0.62 release=1.8 mute=off solo=off
-voice bass: sawtooth volume=-9 cutoff=780 attack=0.01 decay=0.28 sustain=0.48 release=0.65 mute=off solo=off
-voice pulse: sine volume=-16 cutoff=2100 attack=0.005 decay=0.09 sustain=0 release=0.06 mute=off solo=off
-voice texture: square volume=-23 cutoff=1500 attack=0.08 decay=0.6 sustain=0.12 release=1.8 mute=off solo=off
+voice chords: triangle filter=lowpass cutoff=2600 resonance=0.8 detune=4 glide=0 volume=-10 attack=0.08 decay=0.5 sustain=0.62 release=1.8 mute=off solo=off
+voice bass: sawtooth filter=lowpass cutoff=780 resonance=2.4 detune=0 glide=0.08 volume=-9 attack=0.01 decay=0.28 sustain=0.48 release=0.65 mute=off solo=off
+voice pulse: sine filter=lowpass cutoff=2100 resonance=0.7 detune=0 glide=0 volume=-16 attack=0.005 decay=0.09 sustain=0 release=0.06 mute=off solo=off
+voice texture: square filter=bandpass cutoff=1500 resonance=1.2 detune=0 glide=0 volume=-23 attack=0.08 decay=0.6 sustain=0.12 release=1.8 mute=off solo=off
 ```
 
 | Setting | Accepted value | Meaning |
 | --- | --- | --- |
 | First token | `sine`, `triangle`, `square`, or `sawtooth` | Oscillator core. Texture maps these choices to procedural noise colors. |
 | `volume` | `-36`–`-4` | Voice level in dB. |
-| `cutoff` | `80`–`12000` | Low-pass filter cutoff in Hz. Lower values are darker. |
+| `filter` | `lowpass`, `bandpass`, or `highpass` | Filter shape. |
+| `cutoff` | `80`–`12000` | Filter cutoff or center frequency in Hz. |
+| `resonance` | `0`–`12` | Emphasis around the cutoff. High values can become sharp. |
+| `detune` | `-100`–`100` | Oscillator tuning offset in cents. |
+| `glide` | `0`–`0.5` | Portamento in seconds; most audible on Bass. |
 | `attack` | `0.005`–`2` | Fade-in time in seconds. |
 | `decay` | `0.02`–`3` | Time from the attack peak to sustain. |
 | `sustain` | `0`–`1` | Held amplitude. |
@@ -174,14 +188,34 @@ Automation is held from its latest point until another point changes it, includi
 
 Automation note lengths are not meaningful. Write `09=0.72`, not `09=0.72~4`.
 
+## Per-step expression and groove
+
+These lanes change whether and when a step plays without changing its note assignments:
+
+```text
+chance A: 07=0.65 15=0.4
+ratchet A: 11=2 15=3
+shift A: 03=-0.08 07=0.12
+```
+
+- `chance` accepts `0`–`1`; the seed makes the result repeatable in live playback and WAV export.
+- `ratchet` accepts whole numbers `1`–`4` and repeats all events on that step inside its duration.
+- `shift` accepts `-0.45`–`0.45`; negative values are early and positive values are late. Step 01 remains locked to prevent a loop-seam delay.
+- Use `none` when every step uses its default (`chance=1`, `ratchet=1`, `shift=0`).
+
 ## A compact valid example
 
 This scene can be pasted directly into the Code section:
 
 ```text
 scene "Neon Séance" {
-  world: witch-house
+  style: witch-house
+  style-version: 1
+  influences: ambient=0.2
   tempo: 72
+  meter: 4/4
+  steps: 16
+  swing: 0.06
   seed: 1999
   scale: C minor
   lock: on
@@ -251,28 +285,33 @@ scene "Neon Séance" {
 }
 ```
 
-## Starting values for the four sound worlds
+## Built-in style vocabulary
 
 These are creative starting points, not parser requirements.
 
-| World | Suggested direction |
+| Family | Included styles |
 | --- | --- |
-| Witch house | `60`–`82` BPM, long chord releases, half-time Pulse, high Environment and Memory, moderate Veil, restrained Fracture. |
-| Darksynth | `100`–`140` BPM, saw bass, short attack, brighter cutoff, regular Pulse, moderate Overclock and low-to-medium Environment. |
-| Darkwave | `85`–`120` BPM, minor chord movement, triangle or saw cores, medium-to-high Veil, controlled Pulse, moderate reverb. |
-| Glitch | `110`–`180` BPM, short events, irregular Pulse and Texture positions, automated Fracture, moderate Ghost, and bounded Humanize. |
+| Atmospheric | `ambient`, `berlin-school` |
+| Wave & pop | `synthpop`, `new-wave`, `darkwave`, `witch-house` |
+| Club | `house`, `techno`, `acid`, `trance` |
+| Breakbeat | `electro`, `drum-and-bass`, `hip-hop` |
+| Industrial | `industrial-ebm` |
+| Retro | `synthwave`, `darksynth`, `chiptune` |
+| Experimental / cinematic | `glitch`, `cinematic` |
+
+The Style Lab can transform tempo, timing, voices, effects, harmony, patterns, and arrangement independently. The `style` line itself is descriptive when edited directly; use the Style Lab when you want to apply a complete recipe. See [`project-notes/style-system.md`](project-notes/style-system.md) for the data model and extension rules.
 
 ## Common errors
 
 | Error | Fix |
 | --- | --- |
-| `Step 17 is outside this 16-step bar` | Use only `01` through `16`. |
+| `Step … is outside this …-step bar/pattern` | Use positions inside the configured `steps` value. |
 | `needs the form 05=value` | Note, bass, emphasis, and automation tokens need `step=value`. |
 | `is not a step from 01 to 16` | Pulse and Texture use bare step numbers such as `01 05 09 13`. |
 | `is not a note I recognize` | Use `C4`, `Eb4`, or `F#3`; keep the note letter uppercase. |
 | `Note length can be…` | Use only `~1`, `~2`, `~3`, `~4`, or `~8`. |
 | `understands on or off` | Boolean settings do not accept `true`, `false`, `yes`, or `no`. |
-| `is not a voice setting` | Use only waveform, volume, cutoff, ADSR, mute, and solo settings. |
+| `is not a voice setting` | Use only waveform, filter, cutoff, resonance, detune, glide, volume, ADSR, mute, and solo settings. |
 | `not a control in this instrument` | Remove the unknown key or translate it to a supported control. |
 | `scene needs a closing }` | Put one `}` on its own final line. |
 
@@ -288,7 +327,7 @@ Edit this Violet Signal scene to meet the musical request below.
 Return one complete valid Violet Signal scene and no explanation or Markdown fence.
 Preserve all four patterns and every existing line unless the request requires a change.
 Use only controls and ranges from CODE_SECTION_GUIDE.md.
-Keep steps between 01 and 16, note lengths in 1/2/3/4/8, and the arrangement between 1 and 16 bars.
+Keep steps inside the scene's configured pattern length, note lengths in 1/2/3/4/8, and the arrangement between 1 and 16 phrases.
 Do not output JavaScript, JSON, YAML, or invented controls.
 Prefer changing a small number of intentional parameters over randomizing everything.
 
@@ -303,8 +342,13 @@ For a variation rather than a replacement, also say which elements must remain f
 
 ```text
 header        = scene "NAME" {
-world         = witch-house | darksynth | darkwave | glitch
+style         = ambient | berlin-school | synthpop | new-wave | darkwave | witch-house | synthwave | darksynth | house | techno | acid | trance | electro | drum-and-bass | hip-hop | industrial-ebm | chiptune | glitch | cinematic
+style-version = integer 1..999
+influences    = STYLE=number(0..0.8) [...] | none
 tempo         = number 40..220
+meter         = 4/4 | 3/4 | 6/8 | 5/4 | 7/8
+steps         = 8 | 12 | 14 | 16 | 20 | 24 | 28 | 32 | 64
+swing         = number 0..0.75
 seed          = integer 0..2147483647
 scale         = NOTE_ROOT (minor | major)
 lock          = on | off
@@ -312,12 +356,19 @@ patterns      = A B C D
 active        = A | B | C | D
 arrangement   = 1..16 values from A | B | C | D
 waveform      = sine | triangle | square | sawtooth
+filter_type   = lowpass | bandpass | highpass
+resonance     = number 0..12
+detune        = number -100..100
+glide         = number 0..0.5
 note_event    = STEP=NOTE[+NOTE...][~LENGTH]
 bass_event    = STEP=NOTE[~LENGTH]
-STEP          = 01..16
+STEP          = 01..configured_steps
 LENGTH        = 1 | 2 | 3 | 4 | 8
 hit_lane      = STEP [STEP...] | none
 emphasis      = STEP=number(0.1..1) [...] | none
+chance        = STEP=number(0..1) [...] | none
+ratchet       = STEP=integer(1..4) [...] | none
+shift         = STEP=number(-0.45..0.45) [...] | none
 automation    = STEP=value [...] | none
 mask_value    = 80..12000
 effect_value  = 0..1

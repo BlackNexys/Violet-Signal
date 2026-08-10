@@ -30,4 +30,26 @@ describe('shared sequencer resolution', () => {
     state = advanceFatigue(state, 0)
     expect(state.exhaustion).toBeCloseTo(0.965)
   })
+
+  it('combines swing and micro-shift while keeping the loop anchor exact', () => {
+    const composition = makeEmptyComposition()
+    composition.sound.humanize = 0
+    composition.swing = 0.2
+    const pattern = getPattern(composition, 'A')
+    pattern.steps[1].microShift = 0.1
+    const shifted = resolveSequencerStep(composition, pattern, 1, 0, 0, false, 0.125)
+    expect(shifted.timingOffset).toBeCloseTo(0.025)
+    pattern.steps[0].microShift = 0.4
+    expect(resolveSequencerStep(composition, pattern, 0, 0, 0, false, 0.125).timingOffset).toBe(0)
+  })
+
+  it('resolves per-step probability and ratchets deterministically', () => {
+    const composition = makeEmptyComposition()
+    const pattern = getPattern(composition, 'A')
+    pattern.steps[6].probability = 0
+    pattern.steps[6].ratchets = 4
+    const resolved = resolveSequencerStep(composition, pattern, 6, 9, 0, false, 0.125)
+    expect(resolved.shouldPlay).toBe(false)
+    expect(resolved.ratchets).toBe(4)
+  })
 })

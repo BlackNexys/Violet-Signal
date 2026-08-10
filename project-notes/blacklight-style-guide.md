@@ -216,6 +216,8 @@ Voice: intimate, exact, and calm. Prefer “Choose a step, then play a note” o
 
 Icons should be thin, geometric, and familiar at control scale. Pair unfamiliar icons with labels. Custom motifs should derive from an orchid, waveform, aperture, or divided signal line; use them sparingly and with consistent stroke weight.
 
+The Violet Signal identity mark is a five-petal geometric orchid built from mirrored facets around a bright central diamond. Its engineered symmetry expresses the interface shell; overlapping violet planes preserve the organic signal. Keep the mark on a near-black field, retain its warm-violet core, and never simplify it into a generic flower, waveform, or letter V. Use the full mark for product identity and favicon contexts, but do not repeat it as routine panel decoration.
+
 Do not import Japanese characters from the references as decoration. Use another language only when it contains real, reviewed content and has an accessible translation.
 
 ## Accessibility is part of the atmosphere

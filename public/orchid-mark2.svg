@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" role="img" aria-labelledby="title desc">
+  <title id="title">Vivian Geometric Orchid</title>
+  <desc id="desc">A symmetrical, faceted orchid mark in violet, magenta, and cyan, with a subtle V formed in its center.</desc>
+
+  <defs>
+    <linearGradient id="petalLeft" x1="140" y1="155" x2="535" y2="665" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#72E8EC"/>
+      <stop offset="0.48" stop-color="#8B68E8"/>
+      <stop offset="1" stop-color="#D542AF"/>
+    </linearGradient>
+    <linearGradient id="petalRight" x1="860" y1="155" x2="465" y2="665" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#72E8EC"/>
+      <stop offset="0.48" stop-color="#8B68E8"/>
+      <stop offset="1" stop-color="#D542AF"/>
+    </linearGradient>
+    <linearGradient id="crown" x1="500" y1="92" x2="500" y2="590" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8DECEF"/>
+      <stop offset="0.5" stop-color="#936CEB"/>
+      <stop offset="1" stop-color="#D23EAD"/>
+    </linearGradient>
+    <linearGradient id="lip" x1="500" y1="520" x2="500" y2="903" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#F06BBE"/>
+      <stop offset="0.5" stop-color="#A452D7"/>
+      <stop offset="1" stop-color="#654AD0"/>
+    </linearGradient>
+    <linearGradient id="innerGlow" x1="430" y1="478" x2="570" y2="690" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFF4FC"/>
+      <stop offset="0.38" stop-color="#F5A6D8"/>
+      <stop offset="1" stop-color="#B34ED0"/>
+    </linearGradient>
+    <clipPath id="flowerClip">
+      <path d="M500 495 398 236 500 92 602 236Z"/>
+      <path d="M466 563 226 518 106 322 203 160 411 250 500 472Z"/>
+      <path d="M534 563 774 518 894 322 797 160 589 250 500 472Z"/>
+      <path d="M444 548 277 675 125 655 184 489 393 432 500 490Z"/>
+      <path d="M556 548 723 675 875 655 816 489 607 432 500 490Z"/>
+      <path d="M500 497 622 650 574 835 500 908 426 835 378 650Z"/>
+    </clipPath>
+  </defs>
+
+  <g stroke="#21152E" stroke-width="12" stroke-linejoin="round">
+    <!-- Crown petal -->
+    <path d="M500 495 398 236 500 92 602 236Z" fill="url(#crown)"/>
+    <path d="M500 495 500 92 602 236Z" fill="#8259DC" opacity="0.55" stroke="none"/>
+    <path d="M500 132 432 245 500 432 568 245Z" fill="#B270E5" opacity="0.33" stroke="none"/>
+
+    <!-- Upper wings -->
+    <path d="M466 563 226 518 106 322 203 160 411 250 500 472Z" fill="url(#petalLeft)"/>
+    <path d="M534 563 774 518 894 322 797 160 589 250 500 472Z" fill="url(#petalRight)"/>
+    <path d="M466 530 226 518 106 322 390 370 500 472Z" fill="#9C4DCE" opacity="0.42" stroke="none"/>
+    <path d="M534 530 774 518 894 322 610 370 500 472Z" fill="#9C4DCE" opacity="0.42" stroke="none"/>
+    <path d="M130 314 203 160 390 370Z" fill="#71DAE2" opacity="0.36" stroke="none"/>
+    <path d="M870 314 797 160 610 370Z" fill="#71DAE2" opacity="0.36" stroke="none"/>
+
+    <!-- Lower wings -->
+    <path d="M444 548 277 675 125 655 184 489 393 432 500 490Z" fill="url(#petalLeft)"/>
+    <path d="M556 548 723 675 875 655 816 489 607 432 500 490Z" fill="url(#petalRight)"/>
+    <path d="M444 548 277 675 184 489 393 432 500 490Z" fill="#C246AB" opacity="0.38" stroke="none"/>
+    <path d="M556 548 723 675 816 489 607 432 500 490Z" fill="#C246AB" opacity="0.38" stroke="none"/>
+
+    <!-- Orchid lip -->
+    <path d="M500 497 622 650 574 835 500 908 426 835 378 650Z" fill="url(#lip)"/>
+    <path d="M500 540 574 661 542 802 500 853 458 802 426 661Z" fill="#E85AB7" opacity="0.42" stroke="none"/>
+  </g>
+
+  <!-- Fine facet lines -->
+  <g clip-path="url(#flowerClip)" fill="none" stroke="#F7ECFF" stroke-width="7" stroke-linecap="round" opacity="0.31">
+    <path d="M500 472 398 236M500 472 602 236M500 472 203 160M500 472 797 160"/>
+    <path d="M500 490 184 489M500 490 816 489M500 497 426 835M500 497 574 835"/>
+    <path d="M226 518 390 370 411 250M774 518 610 370 589 250"/>
+  </g>
+
+  <!-- Central column and the V: bright lobes frame a dark, unmistakable negative-space letterform. -->
+  <path d="M500 438 438 498 455 606 500 676 545 606 562 498Z" fill="url(#innerGlow)" stroke="#21152E" stroke-width="12" stroke-linejoin="round"/>
+  <path d="M462 512 500 605 538 512 566 536 500 684 434 536Z" fill="#21152E"/>
+  <path d="M500 468 474 506 500 540 526 506Z" fill="#FFF8FD"/>
+  <circle cx="500" cy="486" r="9" fill="#72E8EC"/>
+
+  <!-- Minimal lower stem; it visually completes the V without turning the mark botanical-literal. -->
+  <path d="M500 684V908" fill="none" stroke="#21152E" stroke-width="12" stroke-linecap="round"/>
+  <path d="M500 700V887" fill="none" stroke="#B467E3" stroke-width="5" stroke-linecap="round" opacity="0.9"/>
+</svg>

@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title description">
+  <title id="title">Violet Signal geometric orchid</title>
+  <desc id="description">A five-petal violet orchid constructed from faceted geometric forms.</desc>
+  <defs>
+    <linearGradient id="petal" x1="12" y1="8" x2="50" y2="58" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#e9c4ff"/>
+      <stop offset="0.38" stop-color="#b878f2"/>
+      <stop offset="1" stop-color="#553080"/>
+    </linearGradient>
+    <linearGradient id="lip" x1="32" y1="27" x2="32" y2="61" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#f1d8ff"/>
+      <stop offset="0.42" stop-color="#d477ff"/>
+      <stop offset="1" stop-color="#7134a4"/>
+    </linearGradient>
+    <radialGradient id="heart" cx="0" cy="0" r="1" gradientTransform="translate(32 34) rotate(90) scale(10)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#fff7ff"/>
+      <stop offset="0.38" stop-color="#e6a7ff"/>
+      <stop offset="1" stop-color="#8d4cd1"/>
+    </radialGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="1.6" result="blur"/>
+      <feColorMatrix in="blur" values="1 0 0 0 0.53 0 1 0 0 0.24 0 0 1 0 0.95 0 0 0 .65 0" result="violetBlur"/>
+      <feMerge><feMergeNode in="violetBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <rect x="1" y="1" width="62" height="62" rx="14" fill="#0f0c16" stroke="#4d3862"/>
+  <path d="M8 17V9h8M48 9h8v8M56 47v8h-8M16 55H8v-8" fill="none" stroke="#9668f0" stroke-width="1" opacity=".32"/>
+
+  <g filter="url(#glow)" stroke="#d9a0ff" stroke-width="1.35" stroke-linejoin="bevel">
+    <path d="M32 31 22 16 25 6 32 2 39 6 42 16Z" fill="url(#petal)" fill-opacity=".72"/>
+    <path d="M29 31 15 34 5 29 2 20 9 14 19 17 30 27Z" fill="url(#petal)" fill-opacity=".62"/>
+    <path d="M35 31 49 34 59 29 62 20 55 14 45 17 34 27Z" fill="url(#petal)" fill-opacity=".62"/>
+    <path d="M29 35 18 36 10 44 14 54 24 58 31 42Z" fill="url(#petal)" fill-opacity=".52"/>
+    <path d="M35 35 46 36 54 44 50 54 40 58 33 42Z" fill="url(#petal)" fill-opacity=".52"/>
+    <path d="M32 29 39 37 38 48 32 61 26 48 25 37Z" fill="url(#lip)" fill-opacity=".9"/>
+  </g>
+
+  <g fill="none" stroke="#f0d4ff" stroke-width=".8" opacity=".48">
+    <path d="M32 4v26M23 16l9 7 9-7"/>
+    <path d="M5 21l18 7 6 3M10 15l13 13M59 21l-18 7-6 3M54 15 41 28"/>
+    <path d="m12 45 13-4 4-6M17 55l8-14M52 45l-13-4-4-6M47 55l-8-14"/>
+    <path d="m27 39 5 5 5-5M32 44v14"/>
+  </g>
+
+  <path d="m32 26 7 8-7 9-7-9Z" fill="url(#heart)" stroke="#fff1ff" stroke-width="1.2"/>
+  <path d="m32 30 3 4-3 4-3-4Z" fill="#140d20" stroke="#e9c4ff" stroke-width=".8"/>
+  <circle cx="32" cy="34" r="1.35" fill="#fff7ff"/>
+</svg>

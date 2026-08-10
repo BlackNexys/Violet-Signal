@@ -2,9 +2,11 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { serializeComposition } from '../dsl/serializer'
 import { getActivePattern } from '../model/composition'
 import { getScene } from '../model/scenes'
+import type { StylePreserve } from '../model/styles'
 import { useAppStore } from './store'
 
 describe('shared composition state', () => {
+  const replaceEverything: StylePreserve = { tempo: false, timing: false, harmony: false, patterns: false, arrangement: false, voices: false, effects: false }
   beforeEach(() => {
     useAppStore.getState().setPlaying(false)
     useAppStore.getState().loadScene('rain-behind-glass')
@@ -61,6 +63,40 @@ describe('shared composition state', () => {
     expect(step.notes).toEqual(['D4', 'F4'])
     expect(step.chordLength).toBe(3)
     expect(useAppStore.getState().code).toContain('06=D4+F4~3')
+  })
+
+  it('projects step expression into generated code', () => {
+    useAppStore.getState().selectStep(4, 'drum')
+    useAppStore.getState().setStepExpression('probability', 0.65)
+    useAppStore.getState().setStepExpression('ratchets', 3)
+    useAppStore.getState().setStepExpression('microShift', -0.08)
+    const state = useAppStore.getState()
+    const step = getActivePattern(state.composition).steps[4]
+    expect(step).toMatchObject({ probability: 0.65, ratchets: 3, microShift: -0.08 })
+    expect(state.code).toContain('chance A: 05=0.65')
+    expect(state.code).toContain('ratchet A: 05=3')
+    expect(state.code).toContain('shift A: 05=-0.08')
+  })
+
+  it('applies a style as one undoable composition transformation', () => {
+    useAppStore.getState().applyStyle('glitch', 1, replaceEverything, [{ id: 'ambient', amount: 0.2 }])
+    const styled = useAppStore.getState()
+    expect(styled.composition).toMatchObject({ world: 'glitch', meter: '7/8', stepCount: 14 })
+    expect(styled.currentSceneId).toBe('custom')
+    expect(styled.code).toContain('influences: ambient=0.2')
+    useAppStore.getState().undo()
+    expect(useAppStore.getState().composition.id).toBe('rain-behind-glass')
+  })
+
+  it('queues structural style changes safely during playback', () => {
+    useAppStore.getState().setPlaying(true)
+    useAppStore.getState().selectStep(15)
+    useAppStore.getState().applyStyle('cinematic', 1, replaceEverything, [])
+    expect(useAppStore.getState().composition.stepCount).toBe(16)
+    expect(useAppStore.getState().pendingComposition?.stepCount).toBe(12)
+    expect(useAppStore.getState().selectedStep).toBe(11)
+    useAppStore.getState().applyPending('bar')
+    expect(useAppStore.getState().composition).toMatchObject({ world: 'cinematic', meter: '6/8', stepCount: 12 })
   })
 
   it('copies, transforms, and arranges patterns independently', () => {

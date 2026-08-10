@@ -74,4 +74,30 @@ describe('Violet Signal DSL', () => {
       expect(result.error.message).toContain('outside this 16-step bar')
     }
   })
+
+  it('round-trips flexible timing, style blends, voice character, and step expression', () => {
+    const source = `scene "Odd Transmission" {
+  style: glitch
+  influences: ambient=0.2
+  tempo: 136
+  meter: 7/8
+  steps: 14
+  swing: 0.11
+  voice bass: sawtooth filter=bandpass cutoff=1200 resonance=4.2 detune=-7 glide=0.12 volume=-9 attack=0.01 decay=0.2 sustain=0.4 release=0.3 mute=off solo=off
+  chance A: 07=0.65
+  ratchet A: 11=3
+  shift A: 03=-0.08
+}`
+    const result = parseComposition(source)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.composition.stepCount).toBe(14)
+    expect(result.composition.patterns.every((pattern) => pattern.steps.length === 14)).toBe(true)
+    expect(result.composition.voices.bass).toMatchObject({ filterType: 'bandpass', resonance: 4.2, detune: -7, glide: 0.12 })
+    expect(result.composition.patterns[0].steps[6].probability).toBe(0.65)
+    expect(result.composition.patterns[0].steps[10].ratchets).toBe(3)
+    expect(result.composition.patterns[0].steps[2].microShift).toBe(-0.08)
+    const roundTrip = parseComposition(serializeComposition(result.composition))
+    expect(roundTrip.ok && roundTrip.composition).toEqual(result.composition)
+  })
 })

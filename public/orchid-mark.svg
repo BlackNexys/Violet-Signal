@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" role="img" aria-labelledby="title desc">
+  <title id="title">Vivian geometric orchid sigil</title>
+  <desc id="desc">A luminous, faceted orchid in a rounded midnight frame, with a subtle letter V formed in its heart.</desc>
+
+  <defs>
+    <linearGradient id="frame" x1="100" y1="85" x2="900" y2="915" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#655083"/>
+      <stop offset="0.48" stop-color="#33243F"/>
+      <stop offset="1" stop-color="#573361"/>
+    </linearGradient>
+    <linearGradient id="crown" x1="500" y1="120" x2="500" y2="525" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#89E9EC"/>
+      <stop offset="0.34" stop-color="#A98FF3"/>
+      <stop offset="1" stop-color="#8650CC"/>
+    </linearGradient>
+    <linearGradient id="leftPetal" x1="174" y1="220" x2="540" y2="625" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7BDBE8"/>
+      <stop offset="0.42" stop-color="#9B81E8"/>
+      <stop offset="1" stop-color="#C356B6"/>
+    </linearGradient>
+    <linearGradient id="rightPetal" x1="826" y1="220" x2="460" y2="625" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7BDBE8"/>
+      <stop offset="0.42" stop-color="#9B81E8"/>
+      <stop offset="1" stop-color="#C356B6"/>
+    </linearGradient>
+    <linearGradient id="lowerLeft" x1="180" y1="560" x2="500" y2="700" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#866CE0"/>
+      <stop offset="1" stop-color="#D453B4"/>
+    </linearGradient>
+    <linearGradient id="lowerRight" x1="820" y1="560" x2="500" y2="700" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#866CE0"/>
+      <stop offset="1" stop-color="#D453B4"/>
+    </linearGradient>
+    <linearGradient id="lip" x1="500" y1="500" x2="500" y2="870" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F2B8E3"/>
+      <stop offset="0.38" stop-color="#DD65BE"/>
+      <stop offset="1" stop-color="#7642B7"/>
+    </linearGradient>
+    <radialGradient id="heart" cx="0" cy="0" r="1" gradientTransform="translate(500 530) rotate(90) scale(132)" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFF8FD"/>
+      <stop offset="0.4" stop-color="#F0A9D8"/>
+      <stop offset="1" stop-color="#9A51CE"/>
+    </radialGradient>
+    <linearGradient id="signal" x1="320" y1="160" x2="702" y2="834" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#71E4E8"/>
+      <stop offset="0.52" stop-color="#A779ED"/>
+      <stop offset="1" stop-color="#E35DB8"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Midnight artist-sigil frame -->
+  <rect x="70" y="70" width="860" height="860" rx="210" fill="#0F0C17" stroke="url(#frame)" stroke-width="18"/>
+  <rect x="92" y="92" width="816" height="816" rx="188" fill="none" stroke="#B780EA" stroke-width="3" opacity="0.18"/>
+
+  <!-- Four incomplete corners suggest a viewfinder, signal, and stage frame. -->
+  <g fill="none" stroke="url(#signal)" stroke-width="9" stroke-linecap="square" opacity="0.58">
+    <path d="M155 275V155h120"/>
+    <path d="M725 155h120v120"/>
+    <path d="M845 725v120H725"/>
+    <path d="M275 845H155V725"/>
+  </g>
+
+  <!-- Soft outer silhouette: a static halo that remains reliable across SVG renderers. -->
+  <g fill="none" stroke="#B05DDF" stroke-width="34" stroke-linejoin="round" opacity="0.13">
+    <path d="M500 478 407 279 431 157 500 112 569 157 593 279Z"/>
+    <path d="M464 526 288 531 153 456 128 344 223 257 355 286 479 441Z"/>
+    <path d="M536 526 712 531 847 456 872 344 777 257 645 286 521 441Z"/>
+    <path d="M461 564 319 575 213 680 261 784 391 815 482 640Z"/>
+    <path d="M539 564 681 575 787 680 739 784 609 815 518 640Z"/>
+    <path d="M500 500 600 596 575 718 500 875 425 718 400 596Z"/>
+  </g>
+
+  <!-- Orchid petals -->
+  <g stroke="#DCA8F2" stroke-width="11" stroke-linejoin="bevel">
+    <path d="M500 478 407 279 431 157 500 112 569 157 593 279Z" fill="url(#crown)"/>
+    <path d="M464 526 288 531 153 456 128 344 223 257 355 286 479 441Z" fill="url(#leftPetal)"/>
+    <path d="M536 526 712 531 847 456 872 344 777 257 645 286 521 441Z" fill="url(#rightPetal)"/>
+    <path d="M461 564 319 575 213 680 261 784 391 815 482 640Z" fill="url(#lowerLeft)"/>
+    <path d="M539 564 681 575 787 680 739 784 609 815 518 640Z" fill="url(#lowerRight)"/>
+    <path d="M500 500 600 596 575 718 500 875 425 718 400 596Z" fill="url(#lip)"/>
+  </g>
+
+  <!-- Transparent facet planes keep the flower geometric without making it harsh. -->
+  <g stroke="none">
+    <path d="M500 126 500 462 431 157Z" fill="#D0B0F7" opacity="0.22"/>
+    <path d="M500 126 569 157 500 462Z" fill="#7F62D6" opacity="0.24"/>
+    <path d="M143 351 355 286 440 474 288 531Z" fill="#72DFE6" opacity="0.20"/>
+    <path d="M857 351 645 286 560 474 712 531Z" fill="#72DFE6" opacity="0.20"/>
+    <path d="M213 680 391 815 454 603 319 575Z" fill="#AE5FD3" opacity="0.24"/>
+    <path d="M787 680 609 815 546 603 681 575Z" fill="#AE5FD3" opacity="0.24"/>
+    <path d="M500 527 500 858 425 718Z" fill="#AA58D0" opacity="0.28"/>
+  </g>
+
+  <!-- Fine botanical construction lines borrowed from the reference mark. -->
+  <g fill="none" stroke="#F4D9FB" stroke-width="7" stroke-linecap="round" opacity="0.48">
+    <path d="M500 137v335M431 278l69 72 69-72"/>
+    <path d="M143 354 357 407 464 503M215 268l142 139"/>
+    <path d="M857 354 643 407 536 503M785 268 643 407"/>
+    <path d="M231 684 412 611 461 564M273 775l139-164"/>
+    <path d="M769 684 588 611 539 564M727 775 588 611"/>
+    <path d="M438 612 500 680 562 612M500 680v164"/>
+  </g>
+
+  <!-- Central orchid column -->
+  <path d="M500 443 592 531 500 658 408 531Z" fill="url(#heart)" stroke="#FFF0FC" stroke-width="13" stroke-linejoin="bevel"/>
+
+  <!-- Vivian's V is carried as the flower's darkest inner structure. -->
+  <path d="M438 508 500 599 562 508 584 535 500 660 416 535Z" fill="#171020"/>
+  <path d="M500 476 537 526 500 570 463 526Z" fill="#FFF7FC" stroke="#EFC6EE" stroke-width="7"/>
+  <circle cx="500" cy="526" r="15" fill="#6FE6E8"/>
+
+  <!-- A final hairline repeats the V in light, readable even when the mark is reduced. -->
+  <path d="M468 613 500 660 532 613" fill="none" stroke="#E99BD7" stroke-width="7" stroke-linecap="round"/>
+</svg>

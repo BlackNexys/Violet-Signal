@@ -12,6 +12,8 @@ export interface ResolvedSequencerStep {
   fracture: number
   ghost: number
   timingOffset: number
+  shouldPlay: boolean
+  ratchets: number
   isGhostChord: boolean
   isGhostDrum: boolean
 }
@@ -37,6 +39,7 @@ export function resolveSequencerStep(
   cycle: number,
   exhaustion = 0,
   pressure = false,
+  stepDuration = 0,
 ): ResolvedSequencerStep {
   const current = pattern.steps[step]
   const automatedOverclock = automatedValue(pattern.automation.overclock, step, composition.sound.overclock)
@@ -44,6 +47,15 @@ export function resolveSequencerStep(
   const mapped = mapOverclock(overclock, exhaustion)
   const ghost = automatedValue(pattern.automation.ghost, step, composition.sound.ghost)
   const ghostChance = clamp(ghost * 0.18 + mapped.activityBoost, 0, 0.42)
+  const humanizedOffset = humanizedStepOffset(
+    step,
+    composition.sound.humanize,
+    mapped.timingInstability,
+    seededBipolar(composition.seed, cycle, step, 1),
+  )
+  const swingOffset = step > 0 && step % 2 === 1 ? composition.swing * stepDuration * 0.5 : 0
+  const microOffset = step > 0 ? clamp(current.microShift ?? 0, -0.45, 0.45) * stepDuration : 0
+  const earliestOffset = -Math.min(0.06, stepDuration * 0.4)
 
   return {
     overclock,
@@ -53,12 +65,9 @@ export function resolveSequencerStep(
     veil: automatedValue(pattern.automation.veil, step, composition.sound.veil),
     fracture: automatedValue(pattern.automation.fracture, step, composition.sound.fracture),
     ghost,
-    timingOffset: humanizedStepOffset(
-      step,
-      composition.sound.humanize,
-      mapped.timingInstability,
-      seededBipolar(composition.seed, cycle, step, 1),
-    ),
+    timingOffset: step === 0 ? 0 : clamp(humanizedOffset + swingOffset + microOffset, earliestOffset, stepDuration * 0.48),
+    shouldPlay: seededUnit(composition.seed, cycle, step, 4) <= clamp(current.probability ?? 1, 0, 1),
+    ratchets: clamp(Math.round(current.ratchets ?? 1), 1, 4),
     isGhostChord: current.notes.length === 0 && seededUnit(composition.seed, cycle, step, 2) < ghostChance,
     isGhostDrum: !current.drum && seededUnit(composition.seed, cycle, step, 3) < ghost * 0.13,
   }

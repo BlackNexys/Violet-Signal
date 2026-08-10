@@ -1,10 +1,18 @@
-export const STEP_COUNT = 16
+export const DEFAULT_STEP_COUNT = 16
+/** Legacy alias retained for compact teaching imports and older integrations. */
+export const STEP_COUNT = DEFAULT_STEP_COUNT
+export const STEP_COUNT_OPTIONS = [8, 12, 14, 16, 20, 24, 28, 32, 64] as const
+export const METERS = ['4/4', '3/4', '6/8', '5/4', '7/8'] as const
 export const PATTERN_IDS = ['A', 'B', 'C', 'D'] as const
 
 export type PatternId = (typeof PATTERN_IDS)[number]
 export type Waveform = 'sine' | 'triangle' | 'square' | 'sawtooth'
+export type FilterType = 'lowpass' | 'highpass' | 'bandpass'
 export type ScaleMode = 'minor' | 'major'
-export type SoundWorld = 'witch-house' | 'darksynth' | 'darkwave' | 'glitch'
+export type StyleId = string
+/** @deprecated `world` remains the serialized compatibility name for a style id. */
+export type SoundWorld = StyleId
+export type Meter = (typeof METERS)[number]
 export type VoiceId = 'chords' | 'bass' | 'pulse' | 'texture'
 export type NoteLane = 'notes' | 'bass'
 export type StepLane = NoteLane | 'drum' | 'texture'
@@ -19,6 +27,9 @@ export interface Step {
   velocity: number
   chordLength: number
   bassLength: number
+  probability: number
+  ratchets: number
+  microShift: number
 }
 
 export interface VoiceSettings {
@@ -28,6 +39,10 @@ export interface VoiceSettings {
   decay: number
   sustain: number
   release: number
+  filterType: FilterType
+  resonance: number
+  detune: number
+  glide: number
   volume: number
   mute: boolean
   solo: boolean
@@ -56,7 +71,12 @@ export interface Composition {
   id: string
   name: string
   world: SoundWorld
+  styleVersion: number
+  styleInfluences: Array<{ id: StyleId; amount: number }>
   bpm: number
+  meter: Meter
+  stepCount: number
+  swing: number
   masterVolume: number
   seed: number
   scaleLock: boolean
@@ -71,13 +91,6 @@ export interface Composition {
 
 export const clamp = (value: number, minimum: number, maximum: number) =>
   Math.min(maximum, Math.max(minimum, value))
-
-export const SOUND_WORLD_PROFILES: Record<SoundWorld, { label: string; description: string }> = {
-  'witch-house': { label: 'Witch house', description: 'Slowed ritual pulse · cavernous tails · damaged haze' },
-  darksynth: { label: 'Darksynth', description: 'Driven bass motion · bright saw edges · cinematic pressure' },
-  darkwave: { label: 'Darkwave', description: 'Cold chorus width · minor harmony · restrained machine pulse' },
-  glitch: { label: 'Glitch', description: 'Broken timing · reduced bits · unstable event density' },
-}
 
 export const DEFAULT_SOUND_SETTINGS: SoundSettings = {
   memory: 0.28,
@@ -97,15 +110,18 @@ export const makeEmptyStep = (): Step => ({
   velocity: 0.72,
   chordLength: 1,
   bassLength: 1,
+  probability: 1,
+  ratchets: 1,
+  microShift: 0,
 })
 
-export const makeAutomationLanes = (): AutomationLanes => ({
-  mask: Array.from({ length: STEP_COUNT }, () => null),
-  memory: Array.from({ length: STEP_COUNT }, () => null),
-  veil: Array.from({ length: STEP_COUNT }, () => null),
-  fracture: Array.from({ length: STEP_COUNT }, () => null),
-  ghost: Array.from({ length: STEP_COUNT }, () => null),
-  overclock: Array.from({ length: STEP_COUNT }, () => null),
+export const makeAutomationLanes = (stepCount = DEFAULT_STEP_COUNT): AutomationLanes => ({
+  mask: Array.from({ length: stepCount }, () => null),
+  memory: Array.from({ length: stepCount }, () => null),
+  veil: Array.from({ length: stepCount }, () => null),
+  fracture: Array.from({ length: stepCount }, () => null),
+  ghost: Array.from({ length: stepCount }, () => null),
+  overclock: Array.from({ length: stepCount }, () => null),
 })
 
 function makeVoice(overrides: Partial<VoiceSettings> = {}): VoiceSettings {
@@ -116,6 +132,10 @@ function makeVoice(overrides: Partial<VoiceSettings> = {}): VoiceSettings {
     decay: 0.38,
     sustain: 0.58,
     release: 1.4,
+    filterType: 'lowpass',
+    resonance: 0.7,
+    detune: 0,
+    glide: 0,
     volume: -10,
     mute: false,
     solo: false,
@@ -123,18 +143,23 @@ function makeVoice(overrides: Partial<VoiceSettings> = {}): VoiceSettings {
   }
 }
 
-export const makeEmptyPattern = (id: PatternId): Pattern => ({
+export const makeEmptyPattern = (id: PatternId, stepCount = DEFAULT_STEP_COUNT): Pattern => ({
   id,
   name: `Pattern ${id}`,
-  steps: Array.from({ length: STEP_COUNT }, makeEmptyStep),
-  automation: makeAutomationLanes(),
+  steps: Array.from({ length: stepCount }, makeEmptyStep),
+  automation: makeAutomationLanes(stepCount),
 })
 
 export const makeEmptyComposition = (): Composition => ({
   id: 'untitled-signal',
   name: 'Untitled Signal',
   world: 'darkwave',
+  styleVersion: 1,
+  styleInfluences: [],
   bpm: 92,
+  meter: '4/4',
+  stepCount: DEFAULT_STEP_COUNT,
+  swing: 0,
   masterVolume: -12,
   seed: 1986,
   scaleLock: true,
@@ -147,7 +172,7 @@ export const makeEmptyComposition = (): Composition => ({
     pulse: makeVoice({ core: 'sine', cutoff: 2100, attack: 0.005, decay: 0.09, sustain: 0, release: 0.06, volume: -16 }),
     texture: makeVoice({ core: 'sawtooth', cutoff: 1400, attack: 0.08, decay: 0.6, sustain: 0.12, release: 1.8, volume: -22 }),
   },
-  patterns: PATTERN_IDS.map(makeEmptyPattern),
+  patterns: PATTERN_IDS.map((id) => makeEmptyPattern(id, DEFAULT_STEP_COUNT)),
   activePatternId: 'A',
   arrangement: ['A', 'A', 'B', 'C'],
 })
@@ -219,11 +244,18 @@ export function getActivePattern(composition: Composition): Pattern {
 }
 
 export function cloneStep(step: Step): Step {
-  return { ...step, notes: [...step.notes] }
+  return {
+    ...step,
+    notes: [...step.notes],
+    probability: step.probability ?? 1,
+    ratchets: step.ratchets ?? 1,
+    microShift: step.microShift ?? 0,
+  }
 }
 
 export function clonePattern(pattern: Pattern): Pattern {
-  const lane = (target: AutomationTarget) => [...(pattern.automation[target] ?? Array.from({ length: STEP_COUNT }, () => null))]
+  const stepCount = pattern.steps.length || DEFAULT_STEP_COUNT
+  const lane = (target: AutomationTarget) => Array.from({ length: stepCount }, (_, index) => pattern.automation[target]?.[index] ?? null)
   return {
     ...pattern,
     steps: pattern.steps.map(cloneStep),
@@ -239,19 +271,63 @@ export function clonePattern(pattern: Pattern): Pattern {
 }
 
 export function cloneComposition(composition: Composition): Composition {
+  const stepCount = normalizeStepCount(composition.stepCount ?? composition.patterns?.[0]?.steps.length ?? DEFAULT_STEP_COUNT)
   return {
     ...composition,
     world: composition.world ?? 'darkwave',
+    styleVersion: composition.styleVersion ?? 1,
+    styleInfluences: (composition.styleInfluences ?? []).map((influence) => ({ ...influence, amount: clamp(influence.amount, 0, 1) })),
+    meter: METERS.includes(composition.meter) ? composition.meter : '4/4',
+    stepCount,
+    swing: clamp(composition.swing ?? 0, 0, 0.75),
     sound: { ...DEFAULT_SOUND_SETTINGS, ...composition.sound },
     voices: {
-      chords: { ...composition.voices.chords },
-      bass: { ...composition.voices.bass },
-      pulse: { ...composition.voices.pulse },
-      texture: { ...composition.voices.texture },
+      chords: { ...makeVoice(), ...composition.voices.chords },
+      bass: { ...makeVoice({ core: 'triangle', cutoff: 950, volume: -9 }), ...composition.voices.bass },
+      pulse: { ...makeVoice({ core: 'sine', cutoff: 2100, volume: -16 }), ...composition.voices.pulse },
+      texture: { ...makeVoice({ core: 'sawtooth', cutoff: 1400, volume: -22 }), ...composition.voices.texture },
     },
-    patterns: composition.patterns.map(clonePattern),
+    patterns: composition.patterns.map((pattern) => resizePattern(clonePattern(pattern), stepCount)),
     arrangement: [...composition.arrangement],
   }
+}
+
+export function normalizeStepCount(value: number): number {
+  const rounded = Math.round(value)
+  return STEP_COUNT_OPTIONS.includes(rounded as (typeof STEP_COUNT_OPTIONS)[number]) ? rounded : DEFAULT_STEP_COUNT
+}
+
+export function resizePattern(pattern: Pattern, stepCount: number): Pattern {
+  const count = normalizeStepCount(stepCount)
+  const next = clonePatternWithoutResize(pattern)
+  next.steps = Array.from({ length: count }, (_, index) => index < next.steps.length ? cloneStep(next.steps[index]) : makeEmptyStep())
+  for (const target of Object.keys(next.automation) as AutomationTarget[]) {
+    next.automation[target] = Array.from({ length: count }, (_, index) => next.automation[target][index] ?? null)
+  }
+  return next
+}
+
+function clonePatternWithoutResize(pattern: Pattern): Pattern {
+  const lanes = makeAutomationLanes(pattern.steps.length || DEFAULT_STEP_COUNT)
+  for (const target of Object.keys(lanes) as AutomationTarget[]) lanes[target] = [...(pattern.automation[target] ?? lanes[target])]
+  return { ...pattern, steps: pattern.steps.map(cloneStep), automation: lanes }
+}
+
+export function resizeComposition(composition: Composition, stepCount: number): Composition {
+  const count = normalizeStepCount(stepCount)
+  const next = cloneComposition(composition)
+  next.stepCount = count
+  next.patterns = next.patterns.map((pattern) => resizePattern(pattern, count))
+  return next
+}
+
+export function stepsPerBeat(meter: Meter): number {
+  return meter.endsWith('/8') ? 2 : 4
+}
+
+export function meterParts(meter: Meter): [number, number] {
+  const [beats, denominator] = meter.split('/').map(Number)
+  return [beats, denominator]
 }
 
 export function transposePattern(pattern: Pattern, semitones: number): Pattern {
@@ -265,7 +341,8 @@ export function transposePattern(pattern: Pattern, semitones: number): Pattern {
 
 export function rotatePattern(pattern: Pattern, offset: number): Pattern {
   const next = clonePattern(pattern)
-  const normalized = ((offset % STEP_COUNT) + STEP_COUNT) % STEP_COUNT
+  const stepCount = next.steps.length
+  const normalized = ((offset % stepCount) + stepCount) % stepCount
   next.steps = [...next.steps.slice(-normalized), ...next.steps.slice(0, -normalized)]
   for (const target of Object.keys(next.automation) as AutomationTarget[]) {
     const lane = next.automation[target]

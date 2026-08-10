@@ -1,19 +1,22 @@
 import {
   PATTERN_IDS,
-  SOUND_WORLD_PROFILES,
-  STEP_COUNT,
+  METERS,
+  STEP_COUNT_OPTIONS,
   isNote,
   makeEmptyComposition,
   noteToMidi,
+  resizeComposition,
   type AutomationTarget,
   type Composition,
   type PatternId,
   type ScaleMode,
-  type SoundWorld,
+  type FilterType,
+  type Meter,
   type VoiceId,
   type VoiceSettings,
   type Waveform,
 } from '../model/composition'
+import { STYLE_DEFINITIONS, isStyleId } from '../model/styles'
 
 export interface FriendlyParseError { line: number; message: string; excerpt: string }
 export type ParseResult = { ok: true; composition: Composition } | { ok: false; error: FriendlyParseError }
@@ -23,8 +26,9 @@ class DslError extends Error {
 }
 
 const WAVEFORMS: Waveform[] = ['sine', 'triangle', 'square', 'sawtooth']
+const FILTER_TYPES: FilterType[] = ['lowpass', 'highpass', 'bandpass']
 const VOICES: VoiceId[] = ['chords', 'bass', 'pulse', 'texture']
-const SOUND_WORLDS = Object.keys(SOUND_WORLD_PROFILES) as SoundWorld[]
+const STYLE_IDS = STYLE_DEFINITIONS.map((style) => style.id)
 function fail(message: string, line: number, excerpt: string): never { throw new DslError(message, line, excerpt) }
 function slugify(name: string) { return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'untitled-signal' }
 
@@ -45,24 +49,24 @@ function patternId(value: string, line: number, excerpt: string): PatternId {
   return value as PatternId
 }
 
-function parseAssignments(value: string, line: number, excerpt: string): Array<{ step: number; value: string; length?: number }> {
+function parseAssignments(value: string, stepCount: number, line: number, excerpt: string): Array<{ step: number; value: string; length?: number }> {
   if (value.toLowerCase() === 'none') return []
   return value.split(/\s+/).filter(Boolean).map((token) => {
     const match = /^(\d{1,2})=([^~]+?)(?:~(\d+))?$/.exec(token)
     if (!match) fail(`“${token}” needs the form 05=value.`, line, excerpt)
     const step = Number(match[1])
-    if (step < 1 || step > STEP_COUNT) fail(`Step ${step} is outside this 16-step bar.`, line, excerpt)
+    if (step < 1 || step > stepCount) fail(`Step ${step} is outside this ${stepCount}-step bar/pattern.`, line, excerpt)
     const length = match[3] ? Number(match[3]) : undefined
     if (length !== undefined && ![1, 2, 3, 4, 8].includes(length)) fail('Note length can be 1, 2, 3, 4, or 8 steps.', line, excerpt)
     return { step: step - 1, value: match[2], length }
   })
 }
 
-function parseHits(value: string, line: number, excerpt: string): number[] {
+function parseHits(value: string, stepCount: number, line: number, excerpt: string): number[] {
   if (value.toLowerCase() === 'none') return []
   return value.split(/\s+/).filter(Boolean).map((token) => {
     const step = Number(token)
-    if (!Number.isInteger(step) || step < 1 || step > STEP_COUNT) fail(`“${token}” is not a step from 01 to 16.`, line, excerpt)
+    if (!Number.isInteger(step) || step < 1 || step > stepCount) fail(`“${token}” is not a step from 01 to ${String(stepCount).padStart(2, '0')}.`, line, excerpt)
     return step - 1
   })
 }
@@ -73,7 +77,7 @@ function parseVoice(value: string, voice: VoiceSettings, line: number, excerpt: 
   if (!waveform || !WAVEFORMS.includes(waveform as Waveform)) fail(`Voice starts with ${WAVEFORMS.join(', ')}.`, line, excerpt)
   voice.core = waveform as Waveform
   for (const token of tokens) {
-    const match = /^(volume|cutoff|attack|decay|sustain|release|mute|solo)=(.+)$/.exec(token)
+    const match = /^(volume|cutoff|attack|decay|sustain|release|filter|resonance|detune|glide|mute|solo)=(.+)$/.exec(token)
     if (!match) fail(`“${token}” is not a voice setting.`, line, excerpt)
     const [, key, raw] = match
     if (key === 'volume') voice.volume = numberIn(raw, 'Voice volume', -36, -4, line, excerpt)
@@ -82,6 +86,13 @@ function parseVoice(value: string, voice: VoiceSettings, line: number, excerpt: 
     if (key === 'decay') voice.decay = numberIn(raw, 'Decay', 0.02, 3, line, excerpt)
     if (key === 'sustain') voice.sustain = numberIn(raw, 'Sustain', 0, 1, line, excerpt)
     if (key === 'release') voice.release = numberIn(raw, 'Release', 0.03, 5, line, excerpt)
+    if (key === 'filter') {
+      if (!FILTER_TYPES.includes(raw as FilterType)) fail(`Filter can be ${FILTER_TYPES.join(', ')}.`, line, excerpt)
+      voice.filterType = raw as FilterType
+    }
+    if (key === 'resonance') voice.resonance = numberIn(raw, 'Resonance', 0, 12, line, excerpt)
+    if (key === 'detune') voice.detune = numberIn(raw, 'Detune', -100, 100, line, excerpt)
+    if (key === 'glide') voice.glide = numberIn(raw, 'Glide', 0, 0.5, line, excerpt)
     if (key === 'mute') voice.mute = onOff(raw, 'Mute', line, excerpt)
     if (key === 'solo') voice.solo = onOff(raw, 'Solo', line, excerpt)
   }
@@ -89,7 +100,7 @@ function parseVoice(value: string, voice: VoiceSettings, line: number, excerpt: 
 
 export function parseComposition(source: string): ParseResult {
   const lines = source.replace(/\r/g, '').split('\n')
-  const composition = makeEmptyComposition()
+  let composition = makeEmptyComposition()
   let opened = false
   let closed = false
   let legacyPalette: string[] | null = null
@@ -130,7 +141,7 @@ export function parseComposition(source: string): ParseResult {
         const id = patternId(laneMatch[2].toUpperCase(), lineNumber, rawLine)
         const pattern = composition.patterns.find((item) => item.id === id)!
         if (lane === 'notes' || lane === 'bass') {
-          for (const assignment of parseAssignments(value, lineNumber, rawLine)) {
+          for (const assignment of parseAssignments(value, composition.stepCount, lineNumber, rawLine)) {
             if (lane === 'notes') {
               const notes = assignment.value.split('+')
               const invalid = notes.find((note) => !isNote(note))
@@ -144,11 +155,27 @@ export function parseComposition(source: string): ParseResult {
             }
           }
         } else if (lane === 'pulse' || lane === 'texture') {
-          for (const step of parseHits(value, lineNumber, rawLine)) pattern.steps[step][lane === 'pulse' ? 'drum' : 'texture'] = true
+          for (const step of parseHits(value, composition.stepCount, lineNumber, rawLine)) pattern.steps[step][lane === 'pulse' ? 'drum' : 'texture'] = true
         } else {
-          for (const assignment of parseAssignments(value, lineNumber, rawLine)) {
+          for (const assignment of parseAssignments(value, composition.stepCount, lineNumber, rawLine)) {
             pattern.steps[assignment.step].velocity = numberIn(assignment.value, 'Emphasis', 0.1, 1, lineNumber, rawLine)
           }
+        }
+        continue
+      }
+      const expressionMatch = /^(chance|ratchet|shift)\s+([a-d])$/i.exec(key)
+      if (expressionMatch) {
+        const expression = expressionMatch[1].toLowerCase()
+        const id = patternId(expressionMatch[2].toUpperCase(), lineNumber, rawLine)
+        const pattern = composition.patterns.find((item) => item.id === id)!
+        for (const assignment of parseAssignments(value, composition.stepCount, lineNumber, rawLine)) {
+          if (expression === 'chance') pattern.steps[assignment.step].probability = numberIn(assignment.value, 'Chance', 0, 1, lineNumber, rawLine)
+          if (expression === 'ratchet') {
+            const ratchets = numberIn(assignment.value, 'Ratchet', 1, 4, lineNumber, rawLine)
+            if (!Number.isInteger(ratchets)) fail('Ratchet needs a whole number from 1 to 4.', lineNumber, rawLine)
+            pattern.steps[assignment.step].ratchets = ratchets
+          }
+          if (expression === 'shift') pattern.steps[assignment.step].microShift = numberIn(assignment.value, 'Shift', -0.45, 0.45, lineNumber, rawLine)
         }
         continue
       }
@@ -157,7 +184,7 @@ export function parseComposition(source: string): ParseResult {
         const target = automationMatch[1].toLowerCase() as AutomationTarget
         const id = patternId(automationMatch[2].toUpperCase(), lineNumber, rawLine)
         const lane = composition.patterns.find((item) => item.id === id)!.automation[target]
-        for (const assignment of parseAssignments(value, lineNumber, rawLine)) {
+        for (const assignment of parseAssignments(value, composition.stepCount, lineNumber, rawLine)) {
           const bounds: Record<AutomationTarget, [number, number]> = { mask: [80, 12000], memory: [0, 1], veil: [0, 1], fracture: [0, 1], ghost: [0, 1], overclock: [0, 1] }
           lane[assignment.step] = numberIn(assignment.value, `Automated ${target}`, ...bounds[target], lineNumber, rawLine)
         }
@@ -166,11 +193,35 @@ export function parseComposition(source: string): ParseResult {
 
       switch (key) {
         case 'tempo': composition.bpm = numberIn(value, 'Tempo', 40, 220, lineNumber, rawLine); break
+        case 'style':
         case 'world': {
-          const world = value.toLowerCase() as SoundWorld
-          if (!SOUND_WORLDS.includes(world)) fail(`World can be ${SOUND_WORLDS.join(', ')}.`, lineNumber, rawLine)
-          composition.world = world; break
+          const style = value.toLowerCase()
+          if (!isStyleId(style)) fail(`Style can be ${STYLE_IDS.join(', ')}.`, lineNumber, rawLine)
+          composition.world = style; break
         }
+        case 'influences': {
+          if (value.toLowerCase() === 'none') { composition.styleInfluences = []; break }
+          composition.styleInfluences = value.split(/\s+/).map((token) => {
+            const match = /^([a-z0-9-]+)=(.+)$/.exec(token)
+            if (!match || !isStyleId(match[1])) fail(`“${token}” needs a known style and amount, such as ambient=0.25.`, lineNumber, rawLine)
+            return { id: match[1], amount: numberIn(match[2], 'Influence', 0, 0.8, lineNumber, rawLine) }
+          }); break
+        }
+        case 'style-version': {
+          const version = numberIn(value, 'Style version', 1, 999, lineNumber, rawLine)
+          if (!Number.isInteger(version)) fail('Style version needs a whole number.', lineNumber, rawLine)
+          composition.styleVersion = version; break
+        }
+        case 'meter': {
+          if (!METERS.includes(value as Meter)) fail(`Meter can be ${METERS.join(', ')}.`, lineNumber, rawLine)
+          composition.meter = value as Meter; break
+        }
+        case 'steps': {
+          const count = numberIn(value, 'Steps', Math.min(...STEP_COUNT_OPTIONS), Math.max(...STEP_COUNT_OPTIONS), lineNumber, rawLine)
+          if (!Number.isInteger(count) || !STEP_COUNT_OPTIONS.includes(count as (typeof STEP_COUNT_OPTIONS)[number])) fail(`Steps can be ${STEP_COUNT_OPTIONS.join(', ')}.`, lineNumber, rawLine)
+          composition = resizeComposition(composition, count); break
+        }
+        case 'swing': composition.swing = numberIn(value, 'Swing', 0, 0.75, lineNumber, rawLine); break
         case 'seed': {
           const seed = numberIn(value, 'Seed', 0, 2_147_483_647, lineNumber, rawLine)
           if (!Number.isInteger(seed)) fail('Seed needs a whole number so chance can repeat exactly.', lineNumber, rawLine)
@@ -217,9 +268,9 @@ export function parseComposition(source: string): ParseResult {
         case 'release': composition.voices.chords.release = numberIn(value, 'Release', 0.03, 5, lineNumber, rawLine); break
         case 'notes': {
           const tokens = value.split(/\s+/).filter(Boolean)
-          if (tokens.length < STEP_COUNT && tokens.every(isNote)) legacyPalette = tokens
+          if (tokens.length < composition.stepCount && tokens.every(isNote)) legacyPalette = tokens
           else {
-            if (tokens.length !== STEP_COUNT) fail(`Notes has ${tokens.length} steps; this scene expects 16.`, lineNumber, rawLine)
+            if (tokens.length !== composition.stepCount) fail(`Notes has ${tokens.length} steps; this scene expects ${composition.stepCount}.`, lineNumber, rawLine)
             tokens.forEach((token, step) => {
               if (token === '.') return
               const notes = token.split('+')
@@ -231,7 +282,7 @@ export function parseComposition(source: string): ParseResult {
         }
         case 'bass': {
           const tokens = value.split(/\s+/).filter(Boolean)
-          if (tokens.length !== STEP_COUNT) fail(`Bass has ${tokens.length} steps; this scene expects 16.`, lineNumber, rawLine)
+          if (tokens.length !== composition.stepCount) fail(`Bass has ${tokens.length} steps; this scene expects ${composition.stepCount}.`, lineNumber, rawLine)
           tokens.forEach((token, step) => {
             if (token !== '.' && !isNote(token)) fail(`“${token}” is not a bass note I recognize.`, lineNumber, rawLine)
             if (token !== '.') composition.patterns[0].steps[step].bass = token
@@ -240,7 +291,7 @@ export function parseComposition(source: string): ParseResult {
         }
         case 'rhythm': {
           const tokens = value.split(/\s+/).filter(Boolean)
-          if (tokens.length !== STEP_COUNT) fail(`Rhythm has ${tokens.length} steps; this scene expects 16.`, lineNumber, rawLine)
+          if (tokens.length !== composition.stepCount) fail(`Rhythm has ${tokens.length} steps; this scene expects ${composition.stepCount}.`, lineNumber, rawLine)
           tokens.forEach((token, step) => {
             if (!/^[x.]$/i.test(token)) fail('Rhythm uses x for a hit and . for silence.', lineNumber, rawLine)
             composition.patterns[0].steps[step].drum = token.toLowerCase() === 'x'
@@ -249,7 +300,7 @@ export function parseComposition(source: string): ParseResult {
         }
         case 'pattern': {
           const compact = value.replace(/\s+/g, '')
-          if (!/^[x.]+$/i.test(compact) || compact.length !== STEP_COUNT) fail(`Pattern has ${compact.length} steps; this scene expects 16.`, lineNumber, rawLine)
+          if (!/^[x.]+$/i.test(compact) || compact.length !== composition.stepCount) fail(`Pattern has ${compact.length} steps; this scene expects ${composition.stepCount}.`, lineNumber, rawLine)
           legacyPattern = [...compact].map((token) => token.toLowerCase() === 'x'); break
         }
         default: fail(`“${property[1]}” is not a control in this instrument yet.`, lineNumber, rawLine)

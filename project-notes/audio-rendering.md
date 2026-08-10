@@ -1,6 +1,6 @@
 # Live and offline audio parity
 
-Violet Signal uses one shared set of pure mappings to resolve step automation, seeded Ghost events, deterministic Humanize offsets, fatigue, effect gain staging, and texture noise color. The live engine schedules the resolved events against Tone Transport; the WAV renderer schedules the same written events inside a Tone Offline context.
+Violet Signal uses one shared set of pure mappings to resolve step automation, seeded Ghost and Chance events, deterministic Humanize/Swing/Micro Shift offsets, ratchets, fatigue, effect gain staging, and texture noise color. The live engine schedules the resolved events against Tone Transport; the WAV renderer schedules the same written events inside a Tone Offline context.
 
 The offline synthesis graph mirrors the live graph: four filtered voice channels feed the same input trim, drive, Fracture, Veil, Memory, Environment, master trim, and `−1 dB` limiter. Bass filter-envelope behavior, pulse pitch decay, chord Overclock shaping, and Texture noise color are also matched.
 

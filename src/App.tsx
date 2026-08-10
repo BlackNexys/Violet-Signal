@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 import {
   AudioLines,
   CircleDot,
@@ -11,6 +11,7 @@ import {
   Redo2,
   RotateCcw,
   ShieldAlert,
+  Sparkles,
   SlidersHorizontal,
   Undo2,
 } from 'lucide-react'
@@ -21,14 +22,17 @@ import { InstrumentPanel } from './components/InstrumentPanel'
 import { LearningCenter } from './components/LearningCenter'
 import { ProjectTools } from './components/ProjectTools'
 import { SequencerPanel } from './components/SequencerPanel'
+import { StyleBrowser } from './components/StyleBrowser'
 import { scenes } from './model/scenes'
-import { SOUND_WORLD_PROFILES } from './model/composition'
+import { getStyle } from './model/styles'
 import { useAppStore } from './state/store'
 
 type WorkspaceTab = 'instrument' | 'sequence' | 'code'
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<WorkspaceTab>('sequence')
+  const [styleLabOpen, setStyleLabOpen] = useState(false)
+  const closeStyleLab = useCallback(() => setStyleLabOpen(false), [])
   const composition = useAppStore((state) => state.composition)
   const currentSceneId = useAppStore((state) => state.currentSceneId)
   const isPlaying = useAppStore((state) => state.isPlaying)
@@ -45,13 +49,13 @@ export default function App() {
   const redo = useAppStore((state) => state.redo)
   const setRecordArmed = useAppStore((state) => state.setRecordArmed)
   const { enable, play, pause, stop, panic, audition, startCapture, stopCapture } = useAudioEngine()
-  const worldProfile = SOUND_WORLD_PROFILES[composition.world]
+  const worldProfile = getStyle(composition.world)
 
   return (
     <div className="app-shell">
       <header className="topbar">
         <div className="brand-lockup">
-          <div className="signal-mark" aria-hidden="true"><i /><i /><i /></div>
+          <div className="signal-mark" aria-hidden="true"><img src="/orchid-mark.svg" alt="" /></div>
           <div>
             <span className="brand-kicker">Blacklight instrument 01</span>
             <h1>Violet Signal</h1>
@@ -62,9 +66,10 @@ export default function App() {
           <label htmlFor="scene-select">Scene</label>
           <select id="scene-select" value={currentSceneId} onChange={(event) => loadScene(event.target.value)}>
             {currentSceneId === 'custom' && <option value="custom">Custom project</option>}
-            {scenes.map((scene) => <option key={scene.id} value={scene.id}>{scene.name} · {SOUND_WORLD_PROFILES[scene.world].label}</option>)}
+            {scenes.map((scene) => <option key={scene.id} value={scene.id}>{scene.name} · {getStyle(scene.world).label}</option>)}
           </select>
           <p className="scene-world"><strong>{worldProfile.label}</strong><span>{worldProfile.description}</span></p>
+          <button type="button" className="style-lab-launch" onClick={() => setStyleLabOpen(true)}><Sparkles size={13} /> Style Lab</button>
         </div>
 
         <div className="transport" aria-label="Transport controls">
@@ -128,6 +133,7 @@ export default function App() {
         <span>4 patterns · 4 voices · safe limiter −1 dB</span>
         <span>IndexedDB autosave · no code execution</span>
       </footer>
+      <StyleBrowser open={styleLabOpen} onClose={closeStyleLab} />
     </div>
   )
 }

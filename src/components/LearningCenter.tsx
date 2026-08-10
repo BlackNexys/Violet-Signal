@@ -78,7 +78,7 @@ export function LearningCenter({ onViewChange }: LearningCenterProps) {
     setTutorialOpen(true)
   }
   const copyStarter = async () => {
-    const starter = `world: darkwave\nveil: 0.48\nfracture: 0.04\nnotes A: 01=C4+Eb4+G4~4 05=Ab3+C4+Eb4~4\nbass A: 01=C2~4 05=Ab1~4\npulse A: 01 05 09 13`
+    const starter = `style: darkwave\nmeter: 4/4\nsteps: 16\nswing: 0.035\nveil: 0.48\nfracture: 0.04\nnotes A: 01=C4+Eb4+G4~4 05=Ab3+C4+Eb4~4\nbass A: 01=C2~4 05=Ab1~4\npulse A: 01 05 09 13`
     try {
       await navigator.clipboard.writeText(starter)
       setCopied(true)

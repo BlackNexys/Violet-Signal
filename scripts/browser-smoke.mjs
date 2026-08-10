@@ -25,17 +25,27 @@ const expect = (condition, message) => {
 
 try {
   await page.goto(baseUrl, { waitUntil: 'networkidle' })
+  await mkdir('artifacts', { recursive: true })
   expect((await page.title()) === 'Violet Signal', 'document title did not load')
   await page.getByRole('heading', { name: 'Instrument' }).waitFor()
   await page.getByRole('heading', { name: 'Sequence' }).waitFor()
   await page.getByRole('heading', { name: 'Code' }).waitFor()
   expect((await page.locator('#scene-select option').count()) === 7, 'soundverse scene library did not load')
-  await page.getByText('Witch house', { exact: true }).waitFor()
+  await page.getByText('Witch House', { exact: true }).waitFor()
   await page.getByText('Veil', { exact: true }).first().waitFor()
   await page.getByText('Fracture', { exact: true }).first().waitFor()
 
+  await page.getByRole('button', { name: 'Style Lab', exact: true }).click()
+  await page.getByRole('heading', { name: 'Style Lab' }).waitFor()
+  expect((await page.locator('.style-lab__list > button').count()) === 19, 'complete style registry did not load')
+  await page.screenshot({ path: 'artifacts/violet-signal-style-lab.png', fullPage: true })
+  await page.getByRole('button', { name: 'Close Style Lab' }).click()
+
   await page.getByRole('button', { name: 'Tutorial', exact: true }).click()
   await page.getByRole('heading', { name: 'Begin with a gesture' }).waitFor()
+  await page.getByRole('button', { name: 'Next', exact: true }).click()
+  await page.getByRole('heading', { name: 'Styles are transformable recipes' }).waitFor()
+  expect(await page.locator('.tutorial-target').evaluate((element) => element.matches('.style-lab-launch')), 'tutorial did not highlight Style Lab')
   await page.getByRole('button', { name: 'Next', exact: true }).click()
   await page.getByRole('heading', { name: 'Select before you write' }).waitFor()
   expect((await page.locator('.tutorial-target').count()) === 1, 'tutorial did not highlight its current control')
@@ -43,7 +53,7 @@ try {
   await page.getByRole('button', { name: 'Close tutorial' }).click()
   await page.getByRole('button', { name: 'Cheatsheet', exact: true }).click()
   await page.getByRole('heading', { name: 'Violet Signal cheatsheet' }).waitFor()
-  await page.getByRole('button', { name: 'Sound worlds', exact: true }).click()
+  await page.getByRole('button', { name: 'Styles', exact: true }).click()
   await page.getByText('Fractured Broadcast · 136 bpm').waitFor()
   await page.getByRole('button', { name: 'Notation', exact: true }).click()
   await page.getByText('05=C4+Eb4+G4~4', { exact: false }).first().waitFor()
@@ -136,8 +146,8 @@ try {
   await page.getByText('Saved “Smoke memory”').waitFor()
 
   await page.locator('#scene-select').selectOption('fractured-broadcast')
-  await page.getByText('Glitch', { exact: true }).waitFor()
-  expect((await editor.innerText()).includes('world: glitch'), 'sound-world scene did not reach code')
+  await page.getByText('Glitch / IDM', { exact: true }).waitFor()
+  expect((await editor.innerText()).includes('style: glitch'), 'style scene did not reach code')
 
   const wavDownload = page.waitForEvent('download')
   await page.getByRole('button', { name: 'WAV', exact: true }).click()
@@ -163,7 +173,7 @@ try {
   await page.screenshot({ path: 'artifacts/violet-signal-narrow.png', fullPage: true })
 
   if (failures.length) throw new Error(failures.join('\n'))
-  console.log('Browser smoke passed: sound worlds, synchronization, parser protection, audio effects, capture, WAV, and responsive tabs.')
+  console.log('Browser smoke passed: styles, learning, synchronization, parser protection, audio effects, capture, WAV, and responsive tabs.')
 } finally {
   await browser.close()
 }

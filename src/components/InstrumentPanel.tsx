@@ -1,6 +1,6 @@
 import { useEffect } from 'react'
 import { Activity, AudioWaveform, CloudRain, Gauge, Radio, RotateCcw, ShieldCheck, Snowflake, Zap } from 'lucide-react'
-import { midiToNote, notesForScale, noteToMidi, type VoiceId, type Waveform } from '../model/composition'
+import { midiToNote, notesForScale, noteToMidi, type FilterType, type VoiceId, type Waveform } from '../model/composition'
 import { useAppStore } from '../state/store'
 import { ControlSlider } from './ControlSlider'
 
@@ -10,6 +10,9 @@ const voiceLabels: Record<VoiceId, string> = { chords: 'Chord', bass: 'Bass', pu
 const waveforms: Array<{ value: Waveform; label: string }> = [
   { value: 'sine', label: 'Sine — soft' }, { value: 'triangle', label: 'Triangle — glass' },
   { value: 'square', label: 'Square — hollow' }, { value: 'sawtooth', label: 'Saw — bright' },
+]
+const filterTypes: Array<{ value: FilterType; label: string }> = [
+  { value: 'lowpass', label: 'Low-pass — warm' }, { value: 'bandpass', label: 'Band-pass — focused' }, { value: 'highpass', label: 'High-pass — thin' },
 ]
 const keyBindings = ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k']
 
@@ -82,9 +85,15 @@ export function InstrumentPanel({ audition }: InstrumentPanelProps) {
         <label className="select-control"><span className="sr-only">Core waveform</span>
           <select value={voice.core} onChange={(event) => updateVoice(selectedVoice, 'core', event.target.value as Waveform)}>{waveforms.map((waveform) => <option key={waveform.value} value={waveform.value}>{waveform.label}</option>)}</select>
         </label>
+        <label className="select-control voice-filter-select"><span className="sr-only">Filter character</span>
+          <select value={voice.filterType} onChange={(event) => updateVoice(selectedVoice, 'filterType', event.target.value as FilterType)}>{filterTypes.map((filter) => <option key={filter.value} value={filter.value}>{filter.label}</option>)}</select>
+        </label>
         <div className="two-controls">
           <ControlSlider label="Mask" conventional="Filter cutoff" value={voice.cutoff} min={180} max={9000} step={10} format={(value) => value >= 1000 ? `${(value / 1000).toFixed(1)}k` : `${value}`} onChange={(value) => updateVoice(selectedVoice, 'cutoff', value)} />
+          <ControlSlider label="Focus" conventional="Filter resonance" value={voice.resonance} min={0} max={12} step={0.1} format={(value) => value.toFixed(1)} onChange={(value) => updateVoice(selectedVoice, 'resonance', value)} />
           <ControlSlider label="Level" conventional="Channel volume" value={voice.volume} min={-36} max={-4} step={1} format={(value) => `${value} dB`} onChange={(value) => updateVoice(selectedVoice, 'volume', value)} />
+          <ControlSlider label="Drift" conventional="Oscillator detune" value={voice.detune} min={-100} max={100} step={1} format={(value) => `${value} ct`} onChange={(value) => updateVoice(selectedVoice, 'detune', value)} />
+          <ControlSlider label="Glide" conventional="Pitch portamento" value={voice.glide} min={0} max={0.5} step={0.005} format={(value) => `${Math.round(value * 1000)} ms`} onChange={(value) => updateVoice(selectedVoice, 'glide', value)} />
         </div>
       </div>
 

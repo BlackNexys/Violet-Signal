@@ -17,11 +17,13 @@ import {
   type NoteLane,
   type PatternId,
   type SoundSettings,
+  type Step,
   type StepLane,
   type VoiceId,
   type VoiceSettings,
 } from '../model/composition'
 import { getScene, scenes } from '../model/scenes'
+import { applyStyle as createStyledComposition, type StyleInfluence, type StylePreserve } from '../model/styles'
 
 type Boundary = 'step' | 'beat' | 'bar'
 
@@ -68,6 +70,7 @@ interface AppState {
   toggleHit: (step: number, lane: 'drum' | 'texture') => void
   setStepLength: (lane: NoteLane, length: number) => void
   cycleVelocity: (step: number) => void
+  setStepExpression: (key: 'probability' | 'ratchets' | 'microShift', value: number) => void
   selectPattern: (id: PatternId) => void
   duplicateToNextPattern: () => void
   rotateActivePattern: (offset: number) => void
@@ -76,6 +79,7 @@ interface AppState {
   removeArrangementPattern: (index: number) => void
   clearArrangement: () => void
   setAutomationPoint: (target: AutomationTarget, step: number, value: number | null) => void
+  applyStyle: (styleId: string, strength: number, preserve: StylePreserve, influences: StyleInfluence[]) => void
   setCodeDraft: (code: string) => void
   formatCode: () => void
   setApplyQuantization: (quantization: ApplyQuantization) => void
@@ -211,6 +215,12 @@ export const useAppStore = create<AppState>((set, get) => {
       const step = getActivePattern(draft).steps[stepIndex]
       step.velocity = step.velocity < 0.65 ? 0.75 : step.velocity < 0.85 ? 0.95 : 0.52
     }),
+    setStepExpression: (key, value) => commitMutation((draft) => {
+      const { pattern, stepIndex } = selectedTarget(draft)
+      const step = pattern.steps[stepIndex]
+      const bounds: Record<typeof key, [number, number]> = { probability: [0, 1], ratchets: [1, 4], microShift: [-0.45, 0.45] }
+      step[key] = key === 'ratchets' ? Math.round(clamp(value, ...bounds[key])) : clamp(value, ...bounds[key]) as Step[typeof key]
+    }),
     selectPattern: (activePatternId) => commitMutation((draft) => { draft.activePatternId = activePatternId }),
     duplicateToNextPattern: () => commitMutation((draft) => {
       const currentIndex = PATTERN_IDS.indexOf(draft.activePatternId)
@@ -239,6 +249,16 @@ export const useAppStore = create<AppState>((set, get) => {
     setAutomationPoint: (target, stepIndex, value) => commitMutation((draft) => {
       getActivePattern(draft).automation[target][stepIndex] = value
     }),
+    applyStyle: (styleId, strength, preserve, influences) => {
+      const current = get().composition
+      const next = createStyledComposition(current, styleId, strength, preserve, influences)
+      const nextCode = serializeComposition(next)
+      if (get().isPlaying) {
+        set({ code: nextCode, codeError: null, pendingComposition: next, pendingCode: nextCode, currentSceneId: 'custom', selectedStep: Math.min(get().selectedStep, next.stepCount - 1) })
+        return
+      }
+      set({ composition: next, code: nextCode, codeError: null, pendingComposition: null, pendingCode: null, currentSceneId: 'custom', history: historyWith(get().history, current), future: [], selectedStep: Math.min(get().selectedStep, next.stepCount - 1) })
+    },
     setCodeDraft: (code) => {
       const result = parseComposition(code)
       if (!result.ok) { set({ code, codeError: result.error, pendingComposition: null, pendingCode: null }); return }

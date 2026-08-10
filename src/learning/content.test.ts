@@ -3,7 +3,7 @@ import { cheatSections, tutorialSteps } from './content'
 
 describe('built-in learning content', () => {
   it('covers the complete compose-to-capture workflow in a stable order', () => {
-    expect(tutorialSteps.map((step) => step.id)).toEqual(['wake', 'location', 'notes', 'shape', 'patterns', 'code', 'keep'])
+    expect(tutorialSteps.map((step) => step.id)).toEqual(['wake', 'styles', 'location', 'notes', 'shape', 'patterns', 'code', 'keep'])
     expect(new Set(tutorialSteps.map((step) => step.id)).size).toBe(tutorialSteps.length)
   })
 
@@ -16,11 +16,11 @@ describe('built-in learning content', () => {
   })
 
   it('documents timing, notation, keyboard, terminology, and project handling', () => {
-    expect(cheatSections.map((section) => section.id)).toEqual(['timing', 'notation', 'worlds', 'keys', 'terms', 'projects'])
+    expect(cheatSections.map((section) => section.id)).toEqual(['timing', 'notation', 'styles', 'keys', 'terms', 'projects'])
     const notation = cheatSections.find((section) => section.id === 'notation')!
     expect(notation.items.some((item) => item.example?.includes('05=C4+Eb4+G4~4'))).toBe(true)
     expect(notation.items.some((item) => item.example?.includes('automate mask'))).toBe(true)
     expect(notation.items.some((item) => item.example?.includes('automate fracture'))).toBe(true)
-    expect(cheatSections.find((section) => section.id === 'worlds')?.items).toHaveLength(5)
+    expect(cheatSections.find((section) => section.id === 'styles')?.items.length).toBeGreaterThanOrEqual(8)
   })
 })
