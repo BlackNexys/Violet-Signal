@@ -1,0 +1,271 @@
+import {
+  PATTERN_IDS,
+  SOUND_WORLD_PROFILES,
+  STEP_COUNT,
+  isNote,
+  makeEmptyComposition,
+  noteToMidi,
+  type AutomationTarget,
+  type Composition,
+  type PatternId,
+  type ScaleMode,
+  type SoundWorld,
+  type VoiceId,
+  type VoiceSettings,
+  type Waveform,
+} from '../model/composition'
+
+export interface FriendlyParseError { line: number; message: string; excerpt: string }
+export type ParseResult = { ok: true; composition: Composition } | { ok: false; error: FriendlyParseError }
+
+class DslError extends Error {
+  constructor(message: string, readonly line: number, readonly excerpt: string) { super(message) }
+}
+
+const WAVEFORMS: Waveform[] = ['sine', 'triangle', 'square', 'sawtooth']
+const VOICES: VoiceId[] = ['chords', 'bass', 'pulse', 'texture']
+const SOUND_WORLDS = Object.keys(SOUND_WORLD_PROFILES) as SoundWorld[]
+function fail(message: string, line: number, excerpt: string): never { throw new DslError(message, line, excerpt) }
+function slugify(name: string) { return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'untitled-signal' }
+
+function numberIn(value: string, label: string, min: number, max: number, line: number, excerpt: string): number {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed)) fail(`${label} needs a number, but “${value}” is not one.`, line, excerpt)
+  if (parsed < min || parsed > max) fail(`${label} can range from ${min} to ${max}; ${parsed} falls outside the instrument.`, line, excerpt)
+  return parsed
+}
+
+function onOff(value: string, label: string, line: number, excerpt: string): boolean {
+  if (!/^(on|off)$/i.test(value)) fail(`${label} understands “on” or “off”.`, line, excerpt)
+  return value.toLowerCase() === 'on'
+}
+
+function patternId(value: string, line: number, excerpt: string): PatternId {
+  if (!PATTERN_IDS.includes(value as PatternId)) fail(`Pattern “${value}” is not available. Use A, B, C, or D.`, line, excerpt)
+  return value as PatternId
+}
+
+function parseAssignments(value: string, line: number, excerpt: string): Array<{ step: number; value: string; length?: number }> {
+  if (value.toLowerCase() === 'none') return []
+  return value.split(/\s+/).filter(Boolean).map((token) => {
+    const match = /^(\d{1,2})=([^~]+?)(?:~(\d+))?$/.exec(token)
+    if (!match) fail(`“${token}” needs the form 05=value.`, line, excerpt)
+    const step = Number(match[1])
+    if (step < 1 || step > STEP_COUNT) fail(`Step ${step} is outside this 16-step bar.`, line, excerpt)
+    const length = match[3] ? Number(match[3]) : undefined
+    if (length !== undefined && ![1, 2, 3, 4, 8].includes(length)) fail('Note length can be 1, 2, 3, 4, or 8 steps.', line, excerpt)
+    return { step: step - 1, value: match[2], length }
+  })
+}
+
+function parseHits(value: string, line: number, excerpt: string): number[] {
+  if (value.toLowerCase() === 'none') return []
+  return value.split(/\s+/).filter(Boolean).map((token) => {
+    const step = Number(token)
+    if (!Number.isInteger(step) || step < 1 || step > STEP_COUNT) fail(`“${token}” is not a step from 01 to 16.`, line, excerpt)
+    return step - 1
+  })
+}
+
+function parseVoice(value: string, voice: VoiceSettings, line: number, excerpt: string): void {
+  const tokens = value.split(/\s+/).filter(Boolean)
+  const waveform = tokens.shift()
+  if (!waveform || !WAVEFORMS.includes(waveform as Waveform)) fail(`Voice starts with ${WAVEFORMS.join(', ')}.`, line, excerpt)
+  voice.core = waveform as Waveform
+  for (const token of tokens) {
+    const match = /^(volume|cutoff|attack|decay|sustain|release|mute|solo)=(.+)$/.exec(token)
+    if (!match) fail(`“${token}” is not a voice setting.`, line, excerpt)
+    const [, key, raw] = match
+    if (key === 'volume') voice.volume = numberIn(raw, 'Voice volume', -36, -4, line, excerpt)
+    if (key === 'cutoff') voice.cutoff = numberIn(raw, 'Voice cutoff', 80, 12000, line, excerpt)
+    if (key === 'attack') voice.attack = numberIn(raw, 'Attack', 0.005, 2, line, excerpt)
+    if (key === 'decay') voice.decay = numberIn(raw, 'Decay', 0.02, 3, line, excerpt)
+    if (key === 'sustain') voice.sustain = numberIn(raw, 'Sustain', 0, 1, line, excerpt)
+    if (key === 'release') voice.release = numberIn(raw, 'Release', 0.03, 5, line, excerpt)
+    if (key === 'mute') voice.mute = onOff(raw, 'Mute', line, excerpt)
+    if (key === 'solo') voice.solo = onOff(raw, 'Solo', line, excerpt)
+  }
+}
+
+export function parseComposition(source: string): ParseResult {
+  const lines = source.replace(/\r/g, '').split('\n')
+  const composition = makeEmptyComposition()
+  let opened = false
+  let closed = false
+  let legacyPalette: string[] | null = null
+  let legacyPattern: boolean[] | null = null
+
+  try {
+    for (let index = 0; index < lines.length; index += 1) {
+      const rawLine = lines[index]
+      const lineNumber = index + 1
+      const line = rawLine.trim()
+      if (!line || line.startsWith('//')) continue
+      if (!opened) {
+        const header = /^(?:scene|track)\s+"([^"]+)"\s*\{\s*$/.exec(line)
+        if (!header) fail('Begin with scene "A name" { so the signal has a home.', lineNumber, rawLine)
+        composition.name = header[1].trim()
+        composition.id = slugify(composition.name)
+        opened = true
+        continue
+      }
+      if (line === '}') { closed = true; continue }
+      if (closed) fail('There is music after the closing brace. Move it back inside the scene.', lineNumber, rawLine)
+
+      const property = /^([^:]+?)\s*:\s*(.*?)\s*$/.exec(line)
+      if (!property) fail('This line needs the form “control: value”.', lineNumber, rawLine)
+      const key = property[1].toLowerCase().trim()
+      const value = property[2].trim()
+      if (!value) fail(`“${property[1]}” is waiting for a value.`, lineNumber, rawLine)
+
+      if (key.startsWith('voice ')) {
+        const id = key.slice(6) as VoiceId
+        if (!VOICES.includes(id)) fail(`“${id}” is not a voice.`, lineNumber, rawLine)
+        parseVoice(value, composition.voices[id], lineNumber, rawLine)
+        continue
+      }
+      const laneMatch = /^(notes|bass|pulse|texture|emphasis)\s+([a-d])$/i.exec(key)
+      if (laneMatch) {
+        const lane = laneMatch[1].toLowerCase()
+        const id = patternId(laneMatch[2].toUpperCase(), lineNumber, rawLine)
+        const pattern = composition.patterns.find((item) => item.id === id)!
+        if (lane === 'notes' || lane === 'bass') {
+          for (const assignment of parseAssignments(value, lineNumber, rawLine)) {
+            if (lane === 'notes') {
+              const notes = assignment.value.split('+')
+              const invalid = notes.find((note) => !isNote(note))
+              if (invalid) fail(`“${invalid}” is not a note I recognize. Try C4, Eb4, or F#3.`, lineNumber, rawLine)
+              pattern.steps[assignment.step].notes = notes
+              pattern.steps[assignment.step].chordLength = assignment.length ?? 1
+            } else {
+              if (!isNote(assignment.value)) fail(`“${assignment.value}” is not a bass note I recognize.`, lineNumber, rawLine)
+              pattern.steps[assignment.step].bass = assignment.value
+              pattern.steps[assignment.step].bassLength = assignment.length ?? 1
+            }
+          }
+        } else if (lane === 'pulse' || lane === 'texture') {
+          for (const step of parseHits(value, lineNumber, rawLine)) pattern.steps[step][lane === 'pulse' ? 'drum' : 'texture'] = true
+        } else {
+          for (const assignment of parseAssignments(value, lineNumber, rawLine)) {
+            pattern.steps[assignment.step].velocity = numberIn(assignment.value, 'Emphasis', 0.1, 1, lineNumber, rawLine)
+          }
+        }
+        continue
+      }
+      const automationMatch = /^automate\s+(mask|memory|veil|fracture|ghost|overclock)\s+([a-d])$/i.exec(key)
+      if (automationMatch) {
+        const target = automationMatch[1].toLowerCase() as AutomationTarget
+        const id = patternId(automationMatch[2].toUpperCase(), lineNumber, rawLine)
+        const lane = composition.patterns.find((item) => item.id === id)!.automation[target]
+        for (const assignment of parseAssignments(value, lineNumber, rawLine)) {
+          const bounds: Record<AutomationTarget, [number, number]> = { mask: [80, 12000], memory: [0, 1], veil: [0, 1], fracture: [0, 1], ghost: [0, 1], overclock: [0, 1] }
+          lane[assignment.step] = numberIn(assignment.value, `Automated ${target}`, ...bounds[target], lineNumber, rawLine)
+        }
+        continue
+      }
+
+      switch (key) {
+        case 'tempo': composition.bpm = numberIn(value, 'Tempo', 40, 220, lineNumber, rawLine); break
+        case 'world': {
+          const world = value.toLowerCase() as SoundWorld
+          if (!SOUND_WORLDS.includes(world)) fail(`World can be ${SOUND_WORLDS.join(', ')}.`, lineNumber, rawLine)
+          composition.world = world; break
+        }
+        case 'seed': {
+          const seed = numberIn(value, 'Seed', 0, 2_147_483_647, lineNumber, rawLine)
+          if (!Number.isInteger(seed)) fail('Seed needs a whole number so chance can repeat exactly.', lineNumber, rawLine)
+          composition.seed = seed; break
+        }
+        case 'scale': {
+          const scale = /^([A-G](?:#|b)?)\s+(minor|major)$/i.exec(value)
+          if (!scale || noteToMidi(`${scale[1]}4`) === null) fail('Scale needs a root and mood, such as “C minor”.', lineNumber, rawLine)
+          composition.scaleRoot = scale[1][0].toUpperCase() + scale[1].slice(1)
+          composition.scaleMode = scale[2].toLowerCase() as ScaleMode; break
+        }
+        case 'lock': composition.scaleLock = onOff(value, 'Scale lock', lineNumber, rawLine); break
+        case 'patterns': {
+          const ids = value.split(/\s+/).map((id) => patternId(id.toUpperCase(), lineNumber, rawLine))
+          if (ids.length !== PATTERN_IDS.length || new Set(ids).size !== PATTERN_IDS.length) fail('Patterns must list A B C D once each.', lineNumber, rawLine)
+          break
+        }
+        case 'active': composition.activePatternId = patternId(value.toUpperCase(), lineNumber, rawLine); break
+        case 'arrangement': {
+          const arrangement = value.split(/\s+/).map((id) => patternId(id.toUpperCase(), lineNumber, rawLine))
+          if (!arrangement.length || arrangement.length > 16) fail('Arrangement needs between 1 and 16 pattern letters.', lineNumber, rawLine)
+          composition.arrangement = arrangement; break
+        }
+        case 'memory': composition.sound.memory = numberIn(value, 'Memory', 0, 1, lineNumber, rawLine); break
+        case 'environment': composition.sound.environment = numberIn(value, 'Environment', 0, 1, lineNumber, rawLine); break
+        case 'veil': composition.sound.veil = numberIn(value, 'Veil', 0, 1, lineNumber, rawLine); break
+        case 'fracture': composition.sound.fracture = numberIn(value, 'Fracture', 0, 1, lineNumber, rawLine); break
+        case 'ghost': composition.sound.ghost = numberIn(value, 'Ghost', 0, 1, lineNumber, rawLine); break
+        case 'humanize': composition.sound.humanize = numberIn(value, 'Humanize', 0, 0.2, lineNumber, rawLine); break
+        case 'overclock': composition.sound.overclock = numberIn(value, 'Overclock', 0, 1, lineNumber, rawLine); break
+        case 'output': composition.masterVolume = numberIn(value, 'Output', -36, -6, lineNumber, rawLine); break
+        // Legacy teaching syntax remains importable.
+        case 'instrument':
+        case 'core':
+          if (value === 'violet-glass') composition.voices.chords.core = 'triangle'
+          else if (WAVEFORMS.includes(value as Waveform)) composition.voices.chords.core = value as Waveform
+          else fail(`Core can be ${WAVEFORMS.join(', ')}.`, lineNumber, rawLine)
+          break
+        case 'filter':
+        case 'mask': composition.voices.chords.cutoff = numberIn(value, 'Mask', 80, 12000, lineNumber, rawLine); break
+        case 'attack': composition.voices.chords.attack = numberIn(value, 'Attack', 0.005, 2, lineNumber, rawLine); break
+        case 'decay': composition.voices.chords.decay = numberIn(value, 'Decay', 0.02, 3, lineNumber, rawLine); break
+        case 'sustain': composition.voices.chords.sustain = numberIn(value, 'Sustain', 0, 1, lineNumber, rawLine); break
+        case 'release': composition.voices.chords.release = numberIn(value, 'Release', 0.03, 5, lineNumber, rawLine); break
+        case 'notes': {
+          const tokens = value.split(/\s+/).filter(Boolean)
+          if (tokens.length < STEP_COUNT && tokens.every(isNote)) legacyPalette = tokens
+          else {
+            if (tokens.length !== STEP_COUNT) fail(`Notes has ${tokens.length} steps; this scene expects 16.`, lineNumber, rawLine)
+            tokens.forEach((token, step) => {
+              if (token === '.') return
+              const notes = token.split('+')
+              if (notes.some((note) => !isNote(note))) fail(`“${token}” contains a note I do not recognize.`, lineNumber, rawLine)
+              composition.patterns[0].steps[step].notes = notes
+            })
+          }
+          break
+        }
+        case 'bass': {
+          const tokens = value.split(/\s+/).filter(Boolean)
+          if (tokens.length !== STEP_COUNT) fail(`Bass has ${tokens.length} steps; this scene expects 16.`, lineNumber, rawLine)
+          tokens.forEach((token, step) => {
+            if (token !== '.' && !isNote(token)) fail(`“${token}” is not a bass note I recognize.`, lineNumber, rawLine)
+            if (token !== '.') composition.patterns[0].steps[step].bass = token
+          })
+          break
+        }
+        case 'rhythm': {
+          const tokens = value.split(/\s+/).filter(Boolean)
+          if (tokens.length !== STEP_COUNT) fail(`Rhythm has ${tokens.length} steps; this scene expects 16.`, lineNumber, rawLine)
+          tokens.forEach((token, step) => {
+            if (!/^[x.]$/i.test(token)) fail('Rhythm uses x for a hit and . for silence.', lineNumber, rawLine)
+            composition.patterns[0].steps[step].drum = token.toLowerCase() === 'x'
+          })
+          break
+        }
+        case 'pattern': {
+          const compact = value.replace(/\s+/g, '')
+          if (!/^[x.]+$/i.test(compact) || compact.length !== STEP_COUNT) fail(`Pattern has ${compact.length} steps; this scene expects 16.`, lineNumber, rawLine)
+          legacyPattern = [...compact].map((token) => token.toLowerCase() === 'x'); break
+        }
+        default: fail(`“${property[1]}” is not a control in this instrument yet.`, lineNumber, rawLine)
+      }
+    }
+
+    if (!opened) fail('This scene is empty. Begin with scene "A name" {.', 1, lines[0] ?? '')
+    if (!closed) fail('The scene needs a closing } on its own line.', lines.length, lines.at(-1) ?? '')
+    if (legacyPalette && !legacyPattern) fail('A short note palette needs a pattern line to say when it plays.', 1, '')
+    if (legacyPattern) {
+      const palette = legacyPalette ?? ['C4']
+      legacyPattern.forEach((active, step) => { composition.patterns[0].steps[step].notes = active ? [...palette] : [] })
+    }
+    return { ok: true, composition }
+  } catch (error) {
+    if (error instanceof DslError) return { ok: false, error: { line: error.line, message: error.message, excerpt: error.excerpt } }
+    return { ok: false, error: { line: 1, message: 'The signal slipped out of tune. Check the scene text and try again.', excerpt: '' } }
+  }
+}
