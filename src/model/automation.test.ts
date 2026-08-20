@@ -33,10 +33,13 @@ describe('automation interpolation', () => {
     const legacy = makeEmptyPattern('A')
     legacy.automation.memory[3] = 0.6
     delete (legacy as unknown as { automationModes?: AutomationModes }).automationModes
+    delete (legacy.steps[0] as unknown as { chordTie?: boolean }).chordTie
+    delete (legacy.steps[0] as unknown as { bassTie?: boolean }).bassTie
 
     const migrated = clonePattern(legacy)
 
     expect(Object.values(migrated.automationModes)).toEqual(Array(6).fill('hold'))
     expect(migrated.automation.memory[3]).toBe(0.6)
+    expect(migrated.steps[0]).toMatchObject({ chordTie: false, bassTie: false })
   })
 })

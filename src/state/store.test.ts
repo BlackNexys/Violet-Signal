@@ -87,6 +87,19 @@ describe('shared composition state', () => {
     expect(getActivePattern(useAppStore.getState().composition).automationModes.veil).toBe('hold')
   })
 
+  it('projects independent Chord and Bass ties and clears them with their events', () => {
+    useAppStore.getState().selectStep(0, 'notes')
+    useAppStore.getState().setStepTie('notes', true)
+    expect(getActivePattern(useAppStore.getState().composition).steps[0].chordTie).toBe(true)
+    expect(useAppStore.getState().code).toMatch(/notes A: .*01=[^\s]+>/)
+
+    useAppStore.getState().selectStep(0, 'bass')
+    useAppStore.getState().setStepTie('bass', true)
+    expect(getActivePattern(useAppStore.getState().composition).steps[0].bassTie).toBe(true)
+    useAppStore.getState().clearSelectedLane()
+    expect(getActivePattern(useAppStore.getState().composition).steps[0]).toMatchObject({ bass: null, bassTie: false })
+  })
+
   it('applies a style as one undoable composition transformation', () => {
     useAppStore.getState().applyStyle('glitch', 1, replaceEverything, [{ id: 'ambient', amount: 0.2 }])
     const styled = useAppStore.getState()

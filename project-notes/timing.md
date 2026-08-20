@@ -14,3 +14,5 @@ Step 1 in the interface (internal step zero) is always pinned exactly to the tra
 Meter changes musical grouping rather than the base cell duration. `/4` meters group four sixteenth cells per beat; `/8` meters group two. The live transport uses that grouping for beat-boundary code application and pulse accents. Pattern boundaries remain the safest point for structural changes such as meter or length.
 
 Ratchets divide one cell into one to four evenly scheduled sub-events. Chance uses the same seeded resolver in live and offline playback, so it does not drift between a browser performance and WAV export.
+
+Chord and Bass `>` ties are evaluated on the same step clock and can cross a pattern or occurrence boundary. A valid chain changes pitch at the next event's deterministic shifted timestamp. A rest, failed Chance, mute, Ghost substitution, or ratchet breaks the held lifecycle at that boundary before another event can trigger, preventing stale releases from cutting off later micro-shifted notes.

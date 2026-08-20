@@ -34,6 +34,7 @@ describe('arrangement occurrences', () => {
     const composition = makeEmptyComposition()
     const source = getPattern(composition, 'A')
     source.steps[15].notes = ['B4']
+    source.steps[15].chordTie = true
     source.automation.memory[15] = 0.84
     source.automation.veil[15] = 0.61
     const occurrence = makeArrangementOccurrence('A')
@@ -43,9 +44,11 @@ describe('arrangement occurrences', () => {
     const resolved = resolveArrangementOccurrence(composition, 0)
 
     expect(resolved.pattern.steps[0].notes).toEqual(['B4'])
+    expect(resolved.pattern.steps[0].chordTie).toBe(true)
     expect(resolved.pattern.automation.memory[0]).toBe(0.84)
     expect(resolved.pattern.automation.veil[0]).toBe(0.61)
     expect(source.steps[0].notes).toEqual([])
+    expect(source.steps[0].chordTie).toBe(false)
     expect(source.automation.memory[0]).toBeNull()
   })
 

@@ -170,17 +170,22 @@ For controlled results, change one of these controls at a time. High Memory or E
 Chord and bass lanes use sparse `step=value` assignments.
 
 ```text
-notes A: 01=C4+Eb4+G4~4 09=Ab3+C4+Eb4~4
-bass A: 01=C2~4 09=Ab1~4
+notes A: 01=C4+Eb4+G4> 02=D4+F4+A4 09=Ab3+C4+Eb4~4
+bass A: 01=C2> 02=D2 09=Ab1~4
 ```
 
 - `01=` places the event at step 01.
 - Join chord pitches with `+`.
 - Add `~1`, `~2`, `~3`, `~4`, or `~8` to hold the event for that many steps.
+- Add `>` after the optional length to tie the event into the immediately following step: `01=C2>` or `01=C2~2>`.
 - Without `~length`, the event lasts one step.
 - Bass accepts one pitch per assignment; chords accept one or more pitches.
 - Note names use an uppercase letter, an optional `#` or `b`, and an octave: `C4`, `Eb4`, `F#3`.
 - Use `none` for an empty lane.
+
+A tie is an outgoing connection, so the following step must contain an authored event in the same lane. Repeat the pitch when it should remain steady, or write a new pitch for legato movement. Every connected step except the last needs `>`. Ties continue across pattern and occurrence boundaries during playback; the final offline occurrence releases at the written arrangement end.
+
+Rests, occurrence/global mute, failed Chance, Ghost substitution, and Ratchet values above one break a tie safely. Stop, Pause, Panic, engine replacement, or disabling a selected Shadow cannot leave a held source behind. Gate length applies to ordinary triggers; the explicit tie lifecycle controls connected events. Bass subtractive/FM/AM/dual sources use Glide when changing pitch. Chords retain common pitches while changed voices exchange, and physical-pluck sources re-excite pitches that cannot be repitched continuously.
 
 Assignments on the same line are separated by spaces. Do not use commas.
 
@@ -340,6 +345,7 @@ The Style Lab can transform tempo, timing, voices, effects, harmony, patterns, a
 | `is not a step from 01 to 16` | Pulse and Texture use bare step numbers such as `01 05 09 13`. |
 | `is not a note I recognize` | Use `C4`, `Eb4`, or `F#3`; keep the note letter uppercase. |
 | `Note length can be…` | Use only `~1`, `~2`, `~3`, `~4`, or `~8`. |
+| `needs the form 05=C4~4>` | Put `>` last, after the optional note length. |
 | `understands on or off` | Boolean settings do not accept `true`, `false`, `yes`, or `no`. |
 | `is not a voice setting` | Use the documented Primary/channel settings; put Shadow-only values on a `layer … shadow` line. |
 | `is not available for the … voice` | Choose an engine compatible with Chord/Bass, Pulse, or Texture as listed above. |
@@ -401,8 +407,8 @@ filter_type   = lowpass | bandpass | highpass
 resonance     = number 0..12
 detune        = number -100..100
 glide         = number 0..0.5
-note_event    = STEP=NOTE[+NOTE...][~LENGTH]
-bass_event    = STEP=NOTE[~LENGTH]
+note_event    = STEP=NOTE[+NOTE...][~LENGTH][>]
+bass_event    = STEP=NOTE[~LENGTH][>]
 STEP          = 01..configured_steps
 LENGTH        = 1 | 2 | 3 | 4 | 8
 hit_lane      = STEP [STEP...] | none

@@ -82,7 +82,7 @@ npm run browser:smoke
 2. Select a chord or bass cell in the adaptive 8–64-step grid.
 3. Press the touch keys or computer keys `A S D F G H J K` to add or remove exact pitches.
 4. Use scale-aware chord suggestions for a quick voicing.
-5. Choose a note length of 1, 2, 3, 4, or 8 sixteenth-note steps.
+5. Choose a note length of 1, 2, 3, 4, or 8 sixteenth-note steps, or tie an authored Chord/Bass event into the next step for legato movement.
 
 The sequencer groups cells according to the selected meter. `/4` beats read `1 e & a`; `/8` beats read `1 &`. Pulse and Texture cells toggle directly. Velocity cycles through three useful emphasis levels, while per-step Chance, Ratchet, and Shift controls add deterministic variation and groove.
 
@@ -151,7 +151,7 @@ scene "Rain Behind Glass" {
 }
 ```
 
-Sparse assignments make musical positions explicit: `05=C4+Eb4+G4~4` means “play this chord at step 05 for four steps.” The parser also imports the compact `track`, note-palette, and `pattern: x...` teaching syntax from the original MVP brief.
+Sparse assignments make musical positions explicit: `05=C4+Eb4+G4~4` means “play this chord at step 05 for four steps,” while `05=C4+Eb4+G4>` carries it into the authored event at step 06 without restarting shared pitches. The parser also imports the compact `track`, note-palette, and `pattern: x...` teaching syntax from the original MVP brief.
 
 The CodeMirror editor provides syntax coloring, suggestions, formatting, error-line decoration, and active-token highlighting. Parser errors never move the caret automatically; clicking an error explicitly navigates to its line. Valid live-code edits can apply on the next step, beat, or bar, and queued changes are summarized before they sound.
 
@@ -180,7 +180,7 @@ The audio graph is created only after a user gesture. A shared source factory bu
 ## Current limitations
 
 - The musical architecture intentionally remains four voices, four editable patterns, and sixteen arrangement phrases; patterns can contain 8–64 steps.
-- Note lengths are gated durations rather than legato ties between changing pitches.
+- Chord ties sustain common pitches and exchange changed voices; physical-pluck sources must re-excite changed pitches because their delay line cannot be continuously repitched. Mono subtractive, FM, AM, and dual Bass ties use their pitch-change and Glide path.
 - Offline WAV rendering includes deterministic Ghost/Humanize variation, step automation, and the shared effects graph. Temporary Pressure and Freeze Memory gestures require live capture.
 - Live recording format depends on the browser and is currently downloaded as WebM.
 - Projects are local to the browser profile; there are no accounts or cloud collaboration.
@@ -188,4 +188,4 @@ The audio graph is created only after a user gesture. A shared source factory bu
 
 ## Next valuable milestone
 
-Add true ties and legato source lifecycles with defined behavior across loops, rests, ratchets, probability, panic, engine replacement, and Glide. The adopted sequence—including per-voice effect sends—is maintained in [`notes/instrument-sound-and-layer-expansion-plan.md`](notes/instrument-sound-and-layer-expansion-plan.md).
+Refactor the serial effect chain into shared parallel returns and expose bounded per-voice Fracture, Veil, Memory, and Environment sends with live/offline parity. The adopted sequence is maintained in [`notes/instrument-sound-and-layer-expansion-plan.md`](notes/instrument-sound-and-layer-expansion-plan.md).

@@ -68,7 +68,7 @@ External pack import is intentionally out of scope. When added, it must validate
 
 ## Audio parity
 
-`src/audio/instrumentSource.ts` is shared by live and offline rendering. It owns engine construction, Character mapping, pitch transposition, layer gain, envelope response scaling, triggering, release, and disposal. The live engine may rebuild a source when its engine changes; all other safe updates are applied to the existing source.
+`src/audio/instrumentSource.ts` is shared by live and offline rendering. It owns engine construction, Character mapping, pitch transposition, layer gain, envelope response scaling, one-shot triggering, tied attack/pitch-change/release lifecycles, and disposal. The live engine may rebuild a source when its engine changes; all other safe updates are applied to the existing source.
 
 The browser smoke test applies dual, pluck, and metal patches across all four voices and renders them together through the production offline WAV path. Node unit tests cover mappings, compatibility, notation, and data behavior; the actual Node offline audio test is conditionally skipped when the runtime has no native `OfflineAudioContext`.
 

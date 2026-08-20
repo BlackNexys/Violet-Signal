@@ -423,6 +423,11 @@ button:disabled { cursor: not-allowed; opacity: 0.35; }
 .automation-lane button i { width: 3px; height: calc(var(--automation) * 26px); min-height: 1px; border-radius: 1px; background: var(--violet); opacity: .22; }
 .automation-lane button.has-point i { opacity: 1; box-shadow: 0 0 7px rgba(150,104,240,.28); }
 .automation-editor > input[type="range"] { width: 100%; height: 12px; margin-top: 8px; accent-color: var(--violet); }
+.step-cell.is-tied { box-shadow: inset -2px 0 0 var(--data-cool); }
+.pitched-lifecycle-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.tie-control { display: inline-flex; align-items: center; gap: 6px; color: #b8afbe; font-size: 11px; }
+.tie-control input { accent-color: var(--data-cool); }
+.tie-control small { color: var(--muted); font: 9px var(--font-data); text-transform: uppercase; letter-spacing: .06em; }
 
 .code-panel { display: flex; flex-direction: column; }
 .code-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: -7px 0 9px; }

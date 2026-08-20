@@ -19,7 +19,8 @@ function noteAssignments(pattern: Pattern, lane: 'notes' | 'bass'): string {
     const value = lane === 'notes' ? step.notes.join('+') : step.bass
     if (!value) return
     const length = lane === 'notes' ? step.chordLength : step.bassLength
-    assignments.push(`${stepNumber(index)}=${value}${length > 1 ? `~${length}` : ''}`)
+    const tie = lane === 'notes' ? step.chordTie : step.bassTie
+    assignments.push(`${stepNumber(index)}=${value}${length > 1 ? `~${length}` : ''}${tie ? '>' : ''}`)
   })
   return assignments.length ? assignments.join(' ') : 'none'
 }
@@ -138,7 +139,7 @@ export function activeTokenRanges(source: string, step: number, patternId?: Patt
   let offset = 0
 
   for (const line of source.replace(/\r/g, '').split('\n')) {
-    const match = /^\s*(notes|bass|pulse|texture|emphasis|chance|ratchet|shift|automate\s+\w+)\s+([A-D])\s*:\s*(.*)$/.exec(line)
+    const match = /^\s*(notes|bass|pulse|texture|emphasis|chance|ratchet|shift|automate\s+\w+)\s+([A-D])(?:\s+(?:hold|linear))?\s*:\s*(.*)$/.exec(line)
     if (match && (!patternId || match[2] === patternId)) {
       const valueStart = line.indexOf(match[3])
       for (const token of match[3].matchAll(/\S+/g)) {

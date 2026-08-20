@@ -60,6 +60,7 @@ export function SequencerPanel() {
   const setChord = useAppStore((state) => state.setChord)
   const clearSelectedLane = useAppStore((state) => state.clearSelectedLane)
   const setStepLength = useAppStore((state) => state.setStepLength)
+  const setStepTie = useAppStore((state) => state.setStepTie)
   const selectPattern = useAppStore((state) => state.selectPattern)
   const duplicateToNextPattern = useAppStore((state) => state.duplicateToNextPattern)
   const rotateActivePattern = useAppStore((state) => state.rotateActivePattern)
@@ -204,20 +205,20 @@ export function SequencerPanel() {
           <div className="lane-label"><span>Chords</span><small>Poly voice</small></div>
           {pattern.steps.map((step, index) => (
             <button type="button" key={`notes-${index}`}
-              className={`step-cell note-cell${step.notes.length ? ' is-active' : ''}${activeStep === index && playingPatternId === pattern.id ? ' is-current' : ''}${inspectedStep === index && selectedLane === 'notes' ? ' is-selected' : ''}`}
-              aria-label={`Step ${index + 1} chord: ${step.notes.join(', ') || 'silent'}`} aria-pressed={inspectedStep === index && selectedLane === 'notes'}
+              className={`step-cell note-cell${step.notes.length ? ' is-active' : ''}${step.chordTie ? ' is-tied' : ''}${activeStep === index && playingPatternId === pattern.id ? ' is-current' : ''}${inspectedStep === index && selectedLane === 'notes' ? ' is-selected' : ''}`}
+              aria-label={`Step ${index + 1} chord: ${step.notes.join(', ') || 'silent'}${step.chordTie ? ', tied to next step' : ''}`} aria-pressed={inspectedStep === index && selectedLane === 'notes'}
               onClick={() => selectLane(index, 'notes')}>
-              <span>{shortNotes(step.notes)}</span>{step.notes.length > 0 && step.chordLength > 1 && <small>{step.chordLength}</small>}
+              <span>{shortNotes(step.notes)}</span>{step.notes.length > 0 && (step.chordLength > 1 || step.chordTie) && <small>{step.chordLength > 1 ? step.chordLength : ''}{step.chordTie ? '→' : ''}</small>}
             </button>
           ))}
 
           <div className="lane-label"><span>Bass</span><small>Mono voice</small></div>
           {pattern.steps.map((step, index) => (
             <button type="button" key={`bass-${index}`}
-              className={`step-cell bass-cell${step.bass ? ' is-active' : ''}${activeStep === index && playingPatternId === pattern.id ? ' is-current' : ''}${inspectedStep === index && selectedLane === 'bass' ? ' is-selected' : ''}`}
-              aria-label={`Step ${index + 1} bass: ${step.bass ?? 'silent'}`} aria-pressed={inspectedStep === index && selectedLane === 'bass'}
+              className={`step-cell bass-cell${step.bass ? ' is-active' : ''}${step.bassTie ? ' is-tied' : ''}${activeStep === index && playingPatternId === pattern.id ? ' is-current' : ''}${inspectedStep === index && selectedLane === 'bass' ? ' is-selected' : ''}`}
+              aria-label={`Step ${index + 1} bass: ${step.bass ?? 'silent'}${step.bassTie ? ', tied to next step' : ''}`} aria-pressed={inspectedStep === index && selectedLane === 'bass'}
               onClick={() => selectLane(index, 'bass')}>
-              <span>{step.bass?.replace(/-?\d/, '') ?? '·'}</span>{step.bass && step.bassLength > 1 && <small>{step.bassLength}</small>}
+              <span>{step.bass?.replace(/-?\d/, '') ?? '·'}</span>{step.bass && (step.bassLength > 1 || step.bassTie) && <small>{step.bassLength > 1 ? step.bassLength : ''}{step.bassTie ? '→' : ''}</small>}
             </button>
           ))}
 
@@ -263,7 +264,10 @@ export function SequencerPanel() {
         )}
         {selectedLane === 'bass' && <div className="note-chips">{selected.bass ? <button type="button" onClick={clearSelectedLane}>{selected.bass} ×</button> : <span>No bass note—use the touch keys.</span>}</div>}
         {(selectedLane === 'notes' || selectedLane === 'bass') && (
-          <label className="length-control">Length <select value={selectedLane === 'notes' ? selected.chordLength : selected.bassLength} onChange={(event) => setStepLength(selectedLane as NoteLane, Number(event.target.value))}>{[1, 2, 3, 4, 8].map((length) => <option key={length} value={length}>{length} step{length > 1 ? 's' : ''}</option>)}</select></label>
+          <div className="pitched-lifecycle-controls">
+            <label className="length-control">Length <select value={selectedLane === 'notes' ? selected.chordLength : selected.bassLength} onChange={(event) => setStepLength(selectedLane as NoteLane, Number(event.target.value))}>{[1, 2, 3, 4, 8].map((length) => <option key={length} value={length}>{length} step{length > 1 ? 's' : ''}</option>)}</select></label>
+            <label className="tie-control"><input type="checkbox" disabled={selectedLane === 'notes' ? selected.notes.length === 0 : !selected.bass} checked={selectedLane === 'notes' ? selected.chordTie : selected.bassTie} onChange={(event) => setStepTie(selectedLane as NoteLane, event.target.checked)} /> Tie to next step <small>Legato</small></label>
+          </div>
         )}
         <div className="step-expression">
           <label><span>Chance <output>{Math.round(selected.probability * 100)}%</output></span><input type="range" min={0} max={1} step={0.05} value={selected.probability} onChange={(event) => setStepExpression('probability', Number(event.target.value))} /></label>

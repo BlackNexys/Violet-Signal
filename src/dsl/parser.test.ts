@@ -122,6 +122,30 @@ describe('Violet Signal DSL', () => {
     expect(roundTrip.ok && roundTrip.composition).toEqual(result.composition)
   })
 
+  it('round-trips explicit Chord and Bass ties independently from gate length', () => {
+    const result = parseComposition(`scene "Connected Signal" {
+  notes A: 01=C4+Eb4+G4> 02=D4+F4+A4~2>
+  bass A: 01=C2> 02=D2~4
+}`)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+
+    const [first, second] = result.composition.patterns[0].steps
+    expect(first).toMatchObject({ chordTie: true, bassTie: true })
+    expect(second).toMatchObject({ chordTie: true, bassTie: false, chordLength: 2, bassLength: 4 })
+    const canonical = serializeComposition(result.composition)
+    expect(canonical).toContain('notes A: 01=C4+Eb4+G4> 02=D4+F4+A4~2>')
+    expect(canonical).toContain('bass A: 01=C2> 02=D2~4')
+    const roundTrip = parseComposition(canonical)
+    expect(roundTrip.ok && roundTrip.composition).toEqual(result.composition)
+  })
+
+  it('rejects a tie marker placed before note length', () => {
+    const result = parseComposition('scene "Broken Tie" {\n  bass A: 01=C2>~4\n}')
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error.message).toContain('05=C4~4>')
+  })
+
   it('rejects unsupported automation interpolation modes', () => {
     const result = parseComposition('scene "Unsupported Curve" {\n  automate veil A ease: 01=0.2 09=0.8\n}')
     expect(result.ok).toBe(false)

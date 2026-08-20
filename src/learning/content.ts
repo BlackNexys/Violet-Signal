@@ -95,6 +95,7 @@ export const cheatSections: CheatSection[] = [
       { term: 'Single note', description: 'Place C4 at step 05.', example: 'notes A: 05=C4' },
       { term: 'Chord', description: 'Join pitches with +.', example: '05=C4+Eb4+G4' },
       { term: 'Held chord', description: 'Use ~ followed by a step length.', example: '05=C4+Eb4+G4~4' },
+      { term: 'Tie / legato', description: 'Use > to carry an authored event into the next step without restarting shared pitches.', example: '01=C2> 02=D2' },
       { term: 'Bass', description: 'One pitch per assignment.', example: 'bass A: 01=C2~4' },
       { term: 'Pulse', description: 'List the steps that should strike.', example: 'pulse A: 01 05 09 13' },
       { term: 'Texture', description: 'List procedural-noise events.', example: 'texture A: 03 11' },

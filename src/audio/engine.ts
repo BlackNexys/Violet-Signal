@@ -6,6 +6,7 @@ import { advanceFatigue, resolveSequencerStep } from './sequencing'
 import { delayFeedback, delayWet, INPUT_GAIN, LIMITER_CEILING_DB, masterOutputDb, reverbWet } from './signalPath'
 import { mapFracture, mapVeil } from './soundverse'
 import { LayeredVoiceSource } from './instrumentSource'
+import { resolvePitchedLifecycle } from './legato'
 
 type Boundary = ApplyQuantization
 interface PerformanceState { pressure: boolean; freeze: boolean }
@@ -42,6 +43,10 @@ export class VioletAudioEngine {
   private visualGeneration = 0
   private compositionId = ''
   private lastChord: string[] = ['C4', 'Eb4', 'G4']
+  private chordTied = false
+  private bassTied = false
+  private chordReleasePending = false
+  private bassReleasePending = false
 
   constructor(private readonly callbacks: AudioEngineCallbacks) {}
 
@@ -162,19 +167,48 @@ export class VioletAudioEngine {
     const triggerTimes = Array.from({ length: resolved.ratchets }, (_, index) => jitteredTime + index * ratchetSpacing)
 
     const chordAllowed = occurrenceAllowsVoice(composition, occurrence, 'chords')
+    const chordCanSound = current.notes.length > 0 && resolved.shouldPlay && chordAllowed
+    if (this.chordReleasePending) this.sources.chords?.release(chordCanSound ? jitteredTime : time)
+    this.chordReleasePending = false
+    const chordLifecycle = resolvePitchedLifecycle(this.chordTied, chordCanSound, current.chordTie, resolved.ratchets)
+    if (chordLifecycle.releasePrevious) this.sources.chords?.release(chordCanSound ? jitteredTime : time)
     if (current.notes.length && resolved.shouldPlay && chordAllowed) this.lastChord = [...current.notes]
-    if (resolved.shouldPlay && chordAllowed && (current.notes.length || resolved.isGhostChord)) {
-      const chord = transposeOccurrenceNotes(current.notes.length ? current.notes : this.lastChord, occurrence)
-      const intendedDuration = resolved.isGhostChord ? stepDuration * 0.45 : stepDuration * current.chordLength * 0.94
+    if (chordCanSound) {
+      const chord = transposeOccurrenceNotes(current.notes, occurrence)
+      const velocity = clamp(current.velocity * 0.72, 0.08, 0.78)
+      const selection = occurrenceLayerSelection(occurrence, 'chords')
+      const intendedDuration = stepDuration * current.chordLength * 0.94
       const duration = resolved.ratchets > 1 ? Math.min(intendedDuration, ratchetSpacing * 0.82) : intendedDuration
-      for (const triggerTime of triggerTimes) this.sources.chords?.trigger(chord, duration, triggerTime, clamp(current.velocity * (resolved.isGhostChord ? 0.3 : 0.72), 0.08, 0.78), occurrenceLayerSelection(occurrence, 'chords'))
+      if (chordLifecycle.mode === 'attack') this.sources.chords?.attack(chord, jitteredTime, velocity, selection)
+      else if (chordLifecycle.mode === 'change') {
+        this.sources.chords?.change(chord, jitteredTime, velocity, selection)
+        if (!chordLifecycle.held) this.chordReleasePending = true
+      } else for (const triggerTime of triggerTimes) this.sources.chords?.trigger(chord, duration, triggerTime, velocity, selection)
+    } else if (resolved.shouldPlay && chordAllowed && resolved.isGhostChord) {
+      const chord = transposeOccurrenceNotes(this.lastChord, occurrence)
+      this.sources.chords?.trigger(chord, stepDuration * 0.45, jitteredTime, clamp(current.velocity * 0.3, 0.08, 0.78), occurrenceLayerSelection(occurrence, 'chords'))
     }
-    if (resolved.shouldPlay && current.bass && occurrenceAllowsVoice(composition, occurrence, 'bass')) {
+    this.chordTied = chordLifecycle.held
+
+    const bassAllowed = occurrenceAllowsVoice(composition, occurrence, 'bass')
+    const bassCanSound = Boolean(current.bass) && resolved.shouldPlay && bassAllowed
+    if (this.bassReleasePending) this.sources.bass?.release(bassCanSound ? jitteredTime : time)
+    this.bassReleasePending = false
+    const bassLifecycle = resolvePitchedLifecycle(this.bassTied, bassCanSound, current.bassTie, resolved.ratchets)
+    if (bassLifecycle.releasePrevious) this.sources.bass?.release(bassCanSound ? jitteredTime : time)
+    if (bassCanSound && current.bass) {
       const intendedDuration = stepDuration * current.bassLength * 0.92
       const duration = resolved.ratchets > 1 ? Math.min(intendedDuration, ratchetSpacing * 0.82) : intendedDuration
       const bass = transposeOccurrenceNote(current.bass, occurrence)
-      for (const triggerTime of triggerTimes) this.sources.bass?.trigger(bass, duration, triggerTime, clamp(current.velocity * 0.72, 0.12, 0.72), occurrenceLayerSelection(occurrence, 'bass'))
+      const velocity = clamp(current.velocity * 0.72, 0.12, 0.72)
+      const selection = occurrenceLayerSelection(occurrence, 'bass')
+      if (bassLifecycle.mode === 'attack') this.sources.bass?.attack(bass, jitteredTime, velocity, selection)
+      else if (bassLifecycle.mode === 'change') {
+        this.sources.bass?.change(bass, jitteredTime, velocity, selection)
+        if (!bassLifecycle.held) this.bassReleasePending = true
+      } else for (const triggerTime of triggerTimes) this.sources.bass?.trigger(bass, duration, triggerTime, velocity, selection)
     }
+    this.bassTied = bassLifecycle.held
     if (resolved.shouldPlay && occurrenceAllowsVoice(composition, occurrence, 'pulse') && (current.drum || resolved.isGhostDrum)) {
       for (const triggerTime of triggerTimes) this.sources.pulse?.trigger(resolved.isGhostDrum ? 'C1' : this.step % beatSize === 0 ? 'C1' : 'G1', Math.min(stepDuration * 0.5, ratchetSpacing * 0.72), triggerTime, clamp(current.velocity * (resolved.isGhostDrum ? 0.26 : 0.62), 0.08, 0.64), occurrenceLayerSelection(occurrence, 'pulse'))
     }
@@ -208,9 +242,14 @@ export class VioletAudioEngine {
   }
 
   start(): void { if (this.initialized) Tone.getTransport().start() }
-  pause(): void { Tone.getTransport().pause(); this.visualGeneration += 1; for (const source of Object.values(this.sources)) source.release() }
+  pause(): void {
+    Tone.getTransport().pause(); this.visualGeneration += 1
+    this.chordTied = false; this.bassTied = false; this.chordReleasePending = false; this.bassReleasePending = false
+    for (const source of Object.values(this.sources)) source.release()
+  }
   stop(): void {
     Tone.getTransport().stop(); this.visualGeneration += 1; this.step = 0; this.cycle = 0; this.barIndex = 0
+    this.chordTied = false; this.bassTied = false; this.chordReleasePending = false; this.bassReleasePending = false
     for (const source of Object.values(this.sources)) source.release()
     const composition = this.callbacks.getComposition()
     this.callbacks.onPosition(-1, composition.activePatternId, 0)

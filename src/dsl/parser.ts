@@ -143,6 +143,19 @@ function parseAssignments(value: string, stepCount: number, line: number, excerp
   })
 }
 
+function parsePitchedAssignments(value: string, stepCount: number, line: number, excerpt: string): Array<{ step: number; value: string; length?: number; tie: boolean }> {
+  if (value.toLowerCase() === 'none') return []
+  return value.split(/\s+/).filter(Boolean).map((token) => {
+    const match = /^(\d{1,2})=([^~>]+?)(?:~(\d+))?(>)?$/.exec(token)
+    if (!match) fail(`“${token}” needs the form 05=C4~4>.`, line, excerpt)
+    const step = Number(match[1])
+    if (step < 1 || step > stepCount) fail(`Step ${step} is outside this ${stepCount}-step bar/pattern.`, line, excerpt)
+    const length = match[3] ? Number(match[3]) : undefined
+    if (length !== undefined && ![1, 2, 3, 4, 8].includes(length)) fail('Note length can be 1, 2, 3, 4, or 8 steps.', line, excerpt)
+    return { step: step - 1, value: match[2], length, tie: Boolean(match[4]) }
+  })
+}
+
 function parseHits(value: string, stepCount: number, line: number, excerpt: string): number[] {
   if (value.toLowerCase() === 'none') return []
   return value.split(/\s+/).filter(Boolean).map((token) => {
@@ -283,17 +296,19 @@ export function parseComposition(source: string): ParseResult {
         const id = patternId(laneMatch[2].toUpperCase(), lineNumber, rawLine)
         const pattern = composition.patterns.find((item) => item.id === id)!
         if (lane === 'notes' || lane === 'bass') {
-          for (const assignment of parseAssignments(value, composition.stepCount, lineNumber, rawLine)) {
+          for (const assignment of parsePitchedAssignments(value, composition.stepCount, lineNumber, rawLine)) {
             if (lane === 'notes') {
               const notes = assignment.value.split('+')
               const invalid = notes.find((note) => !isNote(note))
               if (invalid) fail(`“${invalid}” is not a note I recognize. Try C4, Eb4, or F#3.`, lineNumber, rawLine)
               pattern.steps[assignment.step].notes = notes
               pattern.steps[assignment.step].chordLength = assignment.length ?? 1
+              pattern.steps[assignment.step].chordTie = assignment.tie
             } else {
               if (!isNote(assignment.value)) fail(`“${assignment.value}” is not a bass note I recognize.`, lineNumber, rawLine)
               pattern.steps[assignment.step].bass = assignment.value
               pattern.steps[assignment.step].bassLength = assignment.length ?? 1
+              pattern.steps[assignment.step].bassTie = assignment.tie
             }
           }
         } else if (lane === 'pulse' || lane === 'texture') {

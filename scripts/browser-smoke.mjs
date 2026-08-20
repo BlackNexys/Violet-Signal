@@ -78,6 +78,10 @@ try {
   const assignedPitch = `${await secondTouchKey.locator('span').innerText()}${await secondTouchKey.locator('small').innerText()}`
   await secondTouchKey.click()
   expect((await stepTwoChord.getAttribute('aria-label'))?.includes(assignedPitch), 'touch key did not assign the displayed pitch to the selected step')
+  await page.getByRole('checkbox', { name: /Tie to next step/ }).check()
+  expect((await stepTwoChord.getAttribute('aria-label'))?.includes('tied to next step'), 'Chord tie did not reach the sequencer cell')
+  await page.getByRole('button', { name: /Step 3 chord/ }).click()
+  await page.locator('.touch-keyboard button').nth(2).click()
 
   await page.locator('.arrangement-cells button').nth(1).click()
   const occurrenceEditor = page.locator('.occurrence-editor')
@@ -176,6 +180,15 @@ try {
   expect(expandedEngineCode.includes('patch pulse: chrome-wound/iron-pulse@1'), 'metal pulse patch did not reach code')
   expect(expandedEngineCode.includes('patch texture: chrome-wound/arc-ash@1'), 'metal texture patch did not reach code')
 
+  await page.getByRole('button', { name: /Step 1 chord/ }).click()
+  await page.getByRole('checkbox', { name: /Tie to next step/ }).check()
+  await page.getByRole('button', { name: /Step 2 chord/ }).click()
+  await secondTouchKey.click()
+  await page.getByRole('button', { name: /Step 1 bass/ }).click()
+  await page.getByRole('checkbox', { name: /Tie to next step/ }).check()
+  await page.getByRole('button', { name: /Step 2 bass/ }).click()
+  await secondTouchKey.click()
+
   await automationInterpolation.selectOption('linear')
   expect(await automationInterpolation.inputValue() === 'linear', 'Linear automation mode did not reach the offline render composition')
 
@@ -205,7 +218,7 @@ try {
   await page.screenshot({ path: 'artifacts/violet-signal-narrow.png', fullPage: true })
 
   if (failures.length) throw new Error(failures.join('\n'))
-  console.log('Browser smoke passed: scales, styles, arrangement occurrences, Hold/Linear automation, expanded engines, synchronization, parser protection, audio effects, capture, WAV, and responsive tabs.')
+  console.log('Browser smoke passed: scales, styles, arrangement occurrences, Hold/Linear automation, Chord/Bass ties, expanded engines, synchronization, parser protection, audio effects, capture, WAV, and responsive tabs.')
 } finally {
   await browser.close()
 }

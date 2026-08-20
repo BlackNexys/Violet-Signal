@@ -7,6 +7,7 @@ import { advanceFatigue, resolveSequencerStep, type FatigueState } from './seque
 import { delayFeedback, delayWet, INPUT_GAIN, LIMITER_CEILING_DB, masterOutputDb, reverbWet } from './signalPath'
 import { mapFracture, mapVeil } from './soundverse'
 import { LayeredVoiceSource } from './instrumentSource'
+import { resolvePitchedLifecycle } from './legato'
 
 function encodeWav(buffer: AudioBuffer, gain: number): Blob {
   const channels = Math.min(2, buffer.numberOfChannels)
@@ -77,6 +78,10 @@ export async function renderCompositionToWav(composition: Composition): Promise<
     const texture = new LayeredVoiceSource('texture', textureFilter, textureVoice)
 
     let lastChord = ['C4', 'Eb4', 'G4']
+    let chordTied = false
+    let bassTied = false
+    let chordReleasePending = false
+    let bassReleasePending = false
     let fatigue: FatigueState = { heat: 0, exhaustion: 0 }
     let stepCursor = 0
     composition.arrangement.forEach((_, bar) => {
@@ -96,19 +101,48 @@ export async function renderCompositionToWav(composition: Composition): Promise<
         crusher.wet.setValueAtTime(automatedFracture.wet, time)
         crusher.bits.setValueAtTime(automatedFracture.bits, time)
         const chordAllowed = occurrenceAllowsVoice(composition, occurrence, 'chords')
+        const chordCanSound = step.notes.length > 0 && resolved.shouldPlay && chordAllowed
+        if (chordReleasePending) chords.release(chordCanSound ? eventTime : time)
+        chordReleasePending = false
+        const chordLifecycle = resolvePitchedLifecycle(chordTied, chordCanSound, step.chordTie, resolved.ratchets)
+        if (chordLifecycle.releasePrevious) chords.release(chordCanSound ? eventTime : time)
         if (step.notes.length && resolved.shouldPlay && chordAllowed) lastChord = [...step.notes]
-        if (resolved.shouldPlay && chordAllowed && (step.notes.length || resolved.isGhostChord)) {
-          const chord = transposeOccurrenceNotes(step.notes.length ? step.notes : lastChord, occurrence)
-          const intendedDuration = resolved.isGhostChord ? secondsPerStep * 0.45 : secondsPerStep * step.chordLength * 0.94
+        if (chordCanSound) {
+          const chord = transposeOccurrenceNotes(step.notes, occurrence)
+          const velocity = clamp(step.velocity * 0.72, 0.08, 0.78)
+          const selection = occurrenceLayerSelection(occurrence, 'chords')
+          const intendedDuration = secondsPerStep * step.chordLength * 0.94
           const noteDuration = resolved.ratchets > 1 ? Math.min(intendedDuration, ratchetSpacing * 0.82) : intendedDuration
-          for (const triggerTime of triggerTimes) chords.trigger(chord, noteDuration, triggerTime, clamp(step.velocity * (resolved.isGhostChord ? 0.3 : 0.72), 0.08, 0.78), occurrenceLayerSelection(occurrence, 'chords'))
+          if (chordLifecycle.mode === 'attack') chords.attack(chord, eventTime, velocity, selection)
+          else if (chordLifecycle.mode === 'change') {
+            chords.change(chord, eventTime, velocity, selection)
+            if (!chordLifecycle.held) chordReleasePending = true
+          } else for (const triggerTime of triggerTimes) chords.trigger(chord, noteDuration, triggerTime, velocity, selection)
+        } else if (resolved.shouldPlay && chordAllowed && resolved.isGhostChord) {
+          const chord = transposeOccurrenceNotes(lastChord, occurrence)
+          chords.trigger(chord, secondsPerStep * 0.45, eventTime, clamp(step.velocity * 0.3, 0.08, 0.78), occurrenceLayerSelection(occurrence, 'chords'))
         }
-        if (resolved.shouldPlay && step.bass && occurrenceAllowsVoice(composition, occurrence, 'bass')) {
+        chordTied = chordLifecycle.held
+
+        const bassAllowed = occurrenceAllowsVoice(composition, occurrence, 'bass')
+        const bassCanSound = Boolean(step.bass) && resolved.shouldPlay && bassAllowed
+        if (bassReleasePending) bass.release(bassCanSound ? eventTime : time)
+        bassReleasePending = false
+        const bassLifecycle = resolvePitchedLifecycle(bassTied, bassCanSound, step.bassTie, resolved.ratchets)
+        if (bassLifecycle.releasePrevious) bass.release(bassCanSound ? eventTime : time)
+        if (bassCanSound && step.bass) {
           const intendedDuration = secondsPerStep * step.bassLength * 0.92
           const noteDuration = resolved.ratchets > 1 ? Math.min(intendedDuration, ratchetSpacing * 0.82) : intendedDuration
           const bassNote = transposeOccurrenceNote(step.bass, occurrence)
-          for (const triggerTime of triggerTimes) bass.trigger(bassNote, noteDuration, triggerTime, clamp(step.velocity * 0.72, 0.12, 0.72), occurrenceLayerSelection(occurrence, 'bass'))
+          const velocity = clamp(step.velocity * 0.72, 0.12, 0.72)
+          const selection = occurrenceLayerSelection(occurrence, 'bass')
+          if (bassLifecycle.mode === 'attack') bass.attack(bassNote, eventTime, velocity, selection)
+          else if (bassLifecycle.mode === 'change') {
+            bass.change(bassNote, eventTime, velocity, selection)
+            if (!bassLifecycle.held) bassReleasePending = true
+          } else for (const triggerTime of triggerTimes) bass.trigger(bassNote, noteDuration, triggerTime, velocity, selection)
         }
+        bassTied = bassLifecycle.held
         if (resolved.shouldPlay && occurrenceAllowsVoice(composition, occurrence, 'pulse') && (step.drum || resolved.isGhostDrum)) {
           for (const triggerTime of triggerTimes) pulse.trigger(resolved.isGhostDrum ? 'C1' : index % stepsPerBeat(composition.meter) === 0 ? 'C1' : 'G1', Math.min(secondsPerStep * 0.5, ratchetSpacing * 0.72), triggerTime, clamp(step.velocity * (resolved.isGhostDrum ? 0.26 : 0.62), 0.08, 0.64), occurrenceLayerSelection(occurrence, 'pulse'))
         }
@@ -119,6 +153,8 @@ export async function renderCompositionToWav(composition: Composition): Promise<
       })
       stepCursor += pattern.steps.length
     })
+    chords.release(stepCursor * secondsPerStep)
+    bass.release(stepCursor * secondsPerStep)
   }, duration, 2, 44_100)
   const audioBuffer = rendered.get()
   if (!audioBuffer) throw new Error('Offline render produced no audio buffer.')

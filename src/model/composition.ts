@@ -46,6 +46,8 @@ export interface Step {
   velocity: number
   chordLength: number
   bassLength: number
+  chordTie: boolean
+  bassTie: boolean
   probability: number
   ratchets: number
   microShift: number
@@ -153,6 +155,8 @@ export const makeEmptyStep = (): Step => ({
   velocity: 0.72,
   chordLength: 1,
   bassLength: 1,
+  chordTie: false,
+  bassTie: false,
   probability: 1,
   ratchets: 1,
   microShift: 0,
@@ -412,6 +416,8 @@ export function cloneStep(step: Step): Step {
     probability: step.probability ?? 1,
     ratchets: step.ratchets ?? 1,
     microShift: step.microShift ?? 0,
+    chordTie: step.chordTie ?? false,
+    bassTie: step.bassTie ?? false,
   }
 }
 

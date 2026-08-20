@@ -62,7 +62,7 @@ const completions = [
   ...INSTRUMENT_PATCHES.map((patch) => `patch ${patch.role}: ${patch.id}`),
   'arrangement: A A[transpose=12,rotate=2] B[mute=pulse,effects=memory:0.2+veil:-0.1] C[layers=chords:shadow]', 'voice chords: triangle engine=subtractive octave=0 detune=0 layer-level=0 character=0.28 attack-scale=1 release-scale=1 filter=lowpass cutoff=2800 resonance=0.8 glide=0 volume=-10 attack=0.05 decay=0.38 sustain=0.58 release=1.4 mute=off solo=off',
   'layer chords shadow: off engine=subtractive waveform=triangle octave=0 detune=0 level=-18 character=0.28 attack-scale=1 release-scale=1',
-  'notes A: 01=C4+Eb4+G4~4', 'bass A: 01=C2~4', 'pulse A: 01 05 09 13', 'texture A: none',
+  'notes A: 01=C4+Eb4+G4> 02=D4+F4+A4', 'bass A: 01=C2> 02=D2', 'pulse A: 01 05 09 13', 'texture A: none',
   'chance A: 07=0.65', 'ratchet A: 15=3', 'shift A: 03=-0.08',
   'automate mask A: 01=1200 09=4200', 'automate veil A linear: 01=0.2 09=0.7', 'automate fracture A linear: 01=0.05 13=0.65',
   'memory: 0.28', 'environment: 0.2', 'veil: 0.35', 'fracture: 0.08', 'ghost: 0.12', 'humanize: 0.03', 'overclock: 0',
