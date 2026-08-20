@@ -227,6 +227,26 @@ button:disabled { cursor: not-allowed; opacity: 0.35; }
 .panel-heading h2 { margin: 4px 0 0; font-size: 18px; font-weight: 620; letter-spacing: -.015em; color: var(--text); }
 
 .signal-block { position: relative; margin-top: 7px; padding: 16px 12px 18px; border-top: 1px solid var(--border-soft); border-left: 1px solid rgba(81,64,100,.48); background: linear-gradient(110deg, rgba(150,104,240,.035), transparent 48%); }
+.patch-block { padding-bottom: 13px; }
+.patch-select { margin-bottom: 8px; }
+.patch-description { margin: 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
+.patch-description strong { color: var(--signal-soft); font-weight: 600; }
+.layer-rack { display: grid; gap: 8px; margin-bottom: 14px; }
+.layer-row { padding: 11px; border: 1px solid #332a3e; border-radius: 3px; background: rgba(8,7,12,.42); transition: opacity .16s ease, border-color .16s ease; }
+.layer-row.is-disabled { opacity: .58; }
+.layer-row:focus-within { border-color: #72558a; }
+.layer-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.layer-heading > span { display: flex; flex-direction: column; gap: 2px; }
+.layer-heading strong { color: #ddd5dd; font-size: 11px; }
+.layer-heading small { color: var(--dim); font-size: 9px; }
+.layer-heading button { min-width: 45px; height: 28px; border: 1px solid #3c3346; border-radius: 3px; background: #100d15; color: var(--muted); font: 9px var(--font-data); text-transform: uppercase; }
+.layer-heading button.is-active { border-color: #72558a; background: #251a31; color: var(--signal-soft); }
+.layer-row .select-control { margin-bottom: 7px; }
+.layer-row .select-control select { padding-top: 7px; padding-bottom: 7px; font-size: 11px; }
+.layer-controls { margin-top: 12px; }
+.layer-advanced { margin-top: 11px; border-top: 1px solid rgba(81,64,100,.36); }
+.layer-advanced summary { padding-top: 9px; color: var(--dim); font: 9px var(--font-data); text-transform: uppercase; letter-spacing: .08em; cursor: pointer; }
+.layer-advanced[open] summary { margin-bottom: 12px; color: var(--muted); }
 .voice-filter-select { display: block; margin-top: 6px; }
 .voice-tabs { display: grid; grid-template-columns: repeat(4, 1fr); gap: 3px; margin-bottom: 8px; }
 .voice-tabs button { min-width: 0; height: 37px; border: 1px solid var(--border-soft); border-radius: 3px; background: #100e16; color: #8e8394; font-size: 11px; display: flex; align-items: center; justify-content: center; gap: 5px; }

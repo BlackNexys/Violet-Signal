@@ -3,8 +3,9 @@ import { clamp, getPattern, stepsPerBeat, type Composition, type VoiceId } from 
 import { measurePeak, peakNormalizationGain } from './normalization'
 import { mapOverclock } from './overclock'
 import { advanceFatigue, resolveSequencerStep, type FatigueState } from './sequencing'
-import { delayFeedback, delayWet, INPUT_GAIN, LIMITER_CEILING_DB, masterOutputDb, reverbWet, textureNoiseType } from './signalPath'
+import { delayFeedback, delayWet, INPUT_GAIN, LIMITER_CEILING_DB, masterOutputDb, reverbWet } from './signalPath'
 import { mapFracture, mapVeil } from './soundverse'
+import { LayeredVoiceSource } from './instrumentSource'
 
 function audible(composition: Composition, id: VoiceId): boolean {
   const anySolo = Object.values(composition.voices).some((voice) => voice.solo)
@@ -66,31 +67,19 @@ export async function renderCompositionToWav(composition: Composition): Promise<
     const chordVoice = composition.voices.chords
     const chordVolume = new Tone.Volume(chordVoice.volume).connect(input)
     const chordFilter = new Tone.Filter({ frequency: chordVoice.cutoff, type: chordVoice.filterType, rolloff: -24, Q: chordVoice.resonance }).connect(chordVolume)
-    const chords = new Tone.PolySynth(Tone.Synth, {
-      oscillator: { type: chordVoice.core },
-      envelope: { attack: chordVoice.attack * mapped.envelopeScale, decay: chordVoice.decay * mapped.envelopeScale, sustain: chordVoice.sustain, release: chordVoice.release * mapped.envelopeScale },
-    }).connect(chordFilter)
-    chords.maxPolyphony = 16
-    chords.set({ detune: chordVoice.detune + mapped.pitchDriftCents })
+    const chords = new LayeredVoiceSource('chords', chordFilter, chordVoice, { envelopeScale: mapped.envelopeScale, pitchDriftCents: mapped.pitchDriftCents })
     const bassVoice = composition.voices.bass
     const bassVolume = new Tone.Volume(bassVoice.volume).connect(input)
     const bassFilter = new Tone.Filter({ frequency: bassVoice.cutoff, type: bassVoice.filterType, rolloff: -24, Q: bassVoice.resonance }).connect(bassVolume)
-    const bass = new Tone.MonoSynth({
-      oscillator: { type: bassVoice.core }, filter: { type: 'lowpass', rolloff: -24, Q: 1.2 },
-      filterEnvelope: { attack: 0.01, decay: 0.22, sustain: 0.18, release: 0.6, baseFrequency: 70, octaves: 2.4 },
-      envelope: { attack: bassVoice.attack, decay: bassVoice.decay, sustain: bassVoice.sustain, release: bassVoice.release },
-      portamento: bassVoice.glide,
-    }).connect(bassFilter)
-    bass.set({ detune: bassVoice.detune })
+    const bass = new LayeredVoiceSource('bass', bassFilter, bassVoice)
     const pulseVoice = composition.voices.pulse
     const pulseVolume = new Tone.Volume(pulseVoice.volume).connect(input)
     const pulseFilter = new Tone.Filter({ frequency: pulseVoice.cutoff, type: pulseVoice.filterType, rolloff: -24, Q: pulseVoice.resonance }).connect(pulseVolume)
-    const pulse = new Tone.MembraneSynth({ pitchDecay: 0.018, octaves: 4, oscillator: { type: pulseVoice.core }, envelope: { attack: pulseVoice.attack, decay: pulseVoice.decay, sustain: pulseVoice.sustain, release: pulseVoice.release } }).connect(pulseFilter)
-    pulse.set({ detune: pulseVoice.detune })
+    const pulse = new LayeredVoiceSource('pulse', pulseFilter, pulseVoice)
     const textureVoice = composition.voices.texture
     const textureVolume = new Tone.Volume(textureVoice.volume).connect(input)
     const textureFilter = new Tone.Filter({ frequency: textureVoice.cutoff, type: textureVoice.filterType, rolloff: -24, Q: textureVoice.resonance }).connect(textureVolume)
-    const texture = new Tone.NoiseSynth({ noise: { type: textureNoiseType(textureVoice.core) }, envelope: { attack: textureVoice.attack, decay: textureVoice.decay, sustain: textureVoice.sustain, release: textureVoice.release } }).connect(textureFilter)
+    const texture = new LayeredVoiceSource('texture', textureFilter, textureVoice)
 
     let lastChord = ['C4', 'Eb4', 'G4']
     let fatigue: FatigueState = { heat: 0, exhaustion: 0 }
@@ -116,18 +105,18 @@ export async function renderCompositionToWav(composition: Composition): Promise<
           const chord = step.notes.length ? step.notes : lastChord
           const intendedDuration = resolved.isGhostChord ? secondsPerStep * 0.45 : secondsPerStep * step.chordLength * 0.94
           const noteDuration = resolved.ratchets > 1 ? Math.min(intendedDuration, ratchetSpacing * 0.82) : intendedDuration
-          for (const triggerTime of triggerTimes) chords.triggerAttackRelease(chord, noteDuration, triggerTime, clamp(step.velocity * (resolved.isGhostChord ? 0.3 : 0.72), 0.08, 0.78))
+          for (const triggerTime of triggerTimes) chords.trigger(chord, noteDuration, triggerTime, clamp(step.velocity * (resolved.isGhostChord ? 0.3 : 0.72), 0.08, 0.78))
         }
         if (resolved.shouldPlay && step.bass && audible(composition, 'bass')) {
           const intendedDuration = secondsPerStep * step.bassLength * 0.92
           const noteDuration = resolved.ratchets > 1 ? Math.min(intendedDuration, ratchetSpacing * 0.82) : intendedDuration
-          for (const triggerTime of triggerTimes) bass.triggerAttackRelease(step.bass, noteDuration, triggerTime, clamp(step.velocity * 0.72, 0.12, 0.72))
+          for (const triggerTime of triggerTimes) bass.trigger(step.bass, noteDuration, triggerTime, clamp(step.velocity * 0.72, 0.12, 0.72))
         }
         if (resolved.shouldPlay && (step.drum || resolved.isGhostDrum) && audible(composition, 'pulse')) {
-          for (const triggerTime of triggerTimes) pulse.triggerAttackRelease(resolved.isGhostDrum ? 'C1' : index % stepsPerBeat(composition.meter) === 0 ? 'C1' : 'G1', Math.min(secondsPerStep * 0.5, ratchetSpacing * 0.72), triggerTime, clamp(step.velocity * (resolved.isGhostDrum ? 0.26 : 0.62), 0.08, 0.64))
+          for (const triggerTime of triggerTimes) pulse.trigger(resolved.isGhostDrum ? 'C1' : index % stepsPerBeat(composition.meter) === 0 ? 'C1' : 'G1', Math.min(secondsPerStep * 0.5, ratchetSpacing * 0.72), triggerTime, clamp(step.velocity * (resolved.isGhostDrum ? 0.26 : 0.62), 0.08, 0.64))
         }
         if (resolved.shouldPlay && step.texture && audible(composition, 'texture')) {
-          for (const triggerTime of triggerTimes) texture.triggerAttackRelease(Math.min(secondsPerStep * 1.7, ratchetSpacing * 0.82), triggerTime, clamp(step.velocity * 0.28, 0.05, 0.28))
+          for (const triggerTime of triggerTimes) texture.trigger(null, Math.min(secondsPerStep * 1.7, ratchetSpacing * 0.82), triggerTime, clamp(step.velocity * 0.28, 0.05, 0.28))
         }
         fatigue = advanceFatigue(fatigue, resolved.overclock)
       })

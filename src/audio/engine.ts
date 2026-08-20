@@ -2,8 +2,9 @@ import * as Tone from 'tone'
 import { clamp, getPattern, meterParts, stepsPerBeat, type ApplyQuantization, type Composition, type PatternId, type VoiceId } from '../model/composition'
 import { mapOverclock } from './overclock'
 import { advanceFatigue, resolveSequencerStep } from './sequencing'
-import { delayFeedback, delayWet, INPUT_GAIN, LIMITER_CEILING_DB, masterOutputDb, reverbWet, textureNoiseType } from './signalPath'
+import { delayFeedback, delayWet, INPUT_GAIN, LIMITER_CEILING_DB, masterOutputDb, reverbWet } from './signalPath'
 import { mapFracture, mapVeil } from './soundverse'
+import { LayeredVoiceSource } from './instrumentSource'
 
 type Boundary = ApplyQuantization
 interface PerformanceState { pressure: boolean; freeze: boolean }
@@ -18,10 +19,7 @@ export interface AudioEngineCallbacks {
 }
 
 export class VioletAudioEngine {
-  private poly: Tone.PolySynth | null = null
-  private bass: Tone.MonoSynth | null = null
-  private percussion: Tone.MembraneSynth | null = null
-  private texture: Tone.NoiseSynth | null = null
+  private sources: Partial<Record<VoiceId, LayeredVoiceSource>> = {}
   private channels: Partial<Record<VoiceId, VoiceChannel>> = {}
   private input: Tone.Gain | null = null
   private drive: Tone.Distortion | null = null
@@ -80,19 +78,9 @@ export class VioletAudioEngine {
     await this.reverb.ready
 
     for (const id of ['chords', 'bass', 'pulse', 'texture'] as VoiceId[]) this.channels[id] = this.makeChannel(composition, id)
-    const chords = composition.voices.chords
-    this.poly = new Tone.PolySynth(Tone.Synth, { oscillator: { type: chords.core }, envelope: { attack: chords.attack, decay: chords.decay, sustain: chords.sustain, release: chords.release } }).connect(this.channels.chords!.filter)
-    this.poly.maxPolyphony = 16
-    const bass = composition.voices.bass
-    this.bass = new Tone.MonoSynth({
-      oscillator: { type: bass.core }, filter: { type: 'lowpass', rolloff: -24, Q: 1.2 },
-      filterEnvelope: { attack: 0.01, decay: 0.22, sustain: 0.18, release: 0.6, baseFrequency: 70, octaves: 2.4 },
-      envelope: { attack: bass.attack, decay: bass.decay, sustain: bass.sustain, release: bass.release },
-      portamento: bass.glide,
-    }).connect(this.channels.bass!.filter)
-    const pulse = composition.voices.pulse
-    this.percussion = new Tone.MembraneSynth({ pitchDecay: 0.018, octaves: 4, oscillator: { type: pulse.core }, envelope: { attack: pulse.attack, decay: pulse.decay, sustain: pulse.sustain, release: pulse.release } }).connect(this.channels.pulse!.filter)
-    this.texture = new Tone.NoiseSynth({ noise: { type: 'pink' }, envelope: { attack: composition.voices.texture.attack, decay: composition.voices.texture.decay, sustain: composition.voices.texture.sustain, release: composition.voices.texture.release } }).connect(this.channels.texture!.filter)
+    for (const id of ['chords', 'bass', 'pulse', 'texture'] as VoiceId[]) {
+      this.sources[id] = new LayeredVoiceSource(id, this.channels[id]!.filter, composition.voices[id])
+    }
 
     const transport = Tone.getTransport()
     transport.timeSignature = meterParts(composition.meter)
@@ -139,13 +127,11 @@ export class VioletAudioEngine {
       channel.filter.Q.rampTo(voice.resonance, 0.06)
       channel.filter.frequency.rampTo(clamp(voice.cutoff * (id === 'chords' ? mapped.brightness : 1), 80, 12000), 0.06)
     }
-    const chordVoice = composition.voices.chords
-    this.poly?.set({ oscillator: { type: chordVoice.core }, envelope: { attack: chordVoice.attack * mapped.envelopeScale, decay: chordVoice.decay * mapped.envelopeScale, sustain: chordVoice.sustain, release: chordVoice.release * mapped.envelopeScale }, detune: chordVoice.detune + mapped.pitchDriftCents })
-    const bassVoice = composition.voices.bass
-    this.bass?.set({ oscillator: { type: bassVoice.core }, envelope: { attack: bassVoice.attack, decay: bassVoice.decay, sustain: bassVoice.sustain, release: bassVoice.release }, detune: bassVoice.detune, portamento: bassVoice.glide })
-    const pulseVoice = composition.voices.pulse
-    this.percussion?.set({ oscillator: { type: pulseVoice.core }, envelope: { attack: pulseVoice.attack, decay: pulseVoice.decay, sustain: pulseVoice.sustain, release: pulseVoice.release }, detune: pulseVoice.detune })
-    this.texture?.set({ noise: { type: textureNoiseType(composition.voices.texture.core) } })
+    for (const id of ['chords', 'bass', 'pulse', 'texture'] as VoiceId[]) {
+      this.sources[id]?.update(composition.voices[id], id === 'chords'
+        ? { envelopeScale: mapped.envelopeScale, pitchDriftCents: mapped.pitchDriftCents }
+        : { envelopeScale: 1, pitchDriftCents: 0 })
+    }
   }
 
   private tick(time: number): void {
@@ -179,18 +165,18 @@ export class VioletAudioEngine {
       const chord = current.notes.length ? current.notes : this.lastChord
       const intendedDuration = resolved.isGhostChord ? stepDuration * 0.45 : stepDuration * current.chordLength * 0.94
       const duration = resolved.ratchets > 1 ? Math.min(intendedDuration, ratchetSpacing * 0.82) : intendedDuration
-      for (const triggerTime of triggerTimes) this.poly?.triggerAttackRelease(chord, duration, triggerTime, clamp(current.velocity * (resolved.isGhostChord ? 0.3 : 0.72), 0.08, 0.78))
+      for (const triggerTime of triggerTimes) this.sources.chords?.trigger(chord, duration, triggerTime, clamp(current.velocity * (resolved.isGhostChord ? 0.3 : 0.72), 0.08, 0.78))
     }
     if (resolved.shouldPlay && current.bass) {
       const intendedDuration = stepDuration * current.bassLength * 0.92
       const duration = resolved.ratchets > 1 ? Math.min(intendedDuration, ratchetSpacing * 0.82) : intendedDuration
-      for (const triggerTime of triggerTimes) this.bass?.triggerAttackRelease(current.bass, duration, triggerTime, clamp(current.velocity * 0.72, 0.12, 0.72))
+      for (const triggerTime of triggerTimes) this.sources.bass?.trigger(current.bass, duration, triggerTime, clamp(current.velocity * 0.72, 0.12, 0.72))
     }
     if (resolved.shouldPlay && (current.drum || resolved.isGhostDrum)) {
-      for (const triggerTime of triggerTimes) this.percussion?.triggerAttackRelease(resolved.isGhostDrum ? 'C1' : this.step % beatSize === 0 ? 'C1' : 'G1', Math.min(stepDuration * 0.5, ratchetSpacing * 0.72), triggerTime, clamp(current.velocity * (resolved.isGhostDrum ? 0.26 : 0.62), 0.08, 0.64))
+      for (const triggerTime of triggerTimes) this.sources.pulse?.trigger(resolved.isGhostDrum ? 'C1' : this.step % beatSize === 0 ? 'C1' : 'G1', Math.min(stepDuration * 0.5, ratchetSpacing * 0.72), triggerTime, clamp(current.velocity * (resolved.isGhostDrum ? 0.26 : 0.62), 0.08, 0.64))
     }
     if (resolved.shouldPlay && current.texture) {
-      for (const triggerTime of triggerTimes) this.texture?.triggerAttackRelease(Math.min(stepDuration * 1.7, ratchetSpacing * 0.82), triggerTime, clamp(current.velocity * 0.28, 0.05, 0.28))
+      for (const triggerTime of triggerTimes) this.sources.texture?.trigger(null, Math.min(stepDuration * 1.7, ratchetSpacing * 0.82), triggerTime, clamp(current.velocity * 0.28, 0.05, 0.28))
     }
 
     this.updateFatigue(resolved.overclock, time)
@@ -219,26 +205,31 @@ export class VioletAudioEngine {
   }
 
   start(): void { if (this.initialized) Tone.getTransport().start() }
-  pause(): void { Tone.getTransport().pause(); this.visualGeneration += 1; this.poly?.releaseAll(); this.bass?.triggerRelease() }
+  pause(): void { Tone.getTransport().pause(); this.visualGeneration += 1; for (const source of Object.values(this.sources)) source.release() }
   stop(): void {
     Tone.getTransport().stop(); this.visualGeneration += 1; this.step = 0; this.cycle = 0; this.barIndex = 0
-    this.poly?.releaseAll(); this.bass?.triggerRelease()
+    for (const source of Object.values(this.sources)) source.release()
     const composition = this.callbacks.getComposition()
     this.callbacks.onPosition(-1, composition.activePatternId, 0)
   }
-  audition(note: string): void { if (this.initialized) this.poly?.triggerAttackRelease(note, '8n', Tone.now(), 0.55) }
+  audition(note: string, role: VoiceId = 'chords'): void {
+    if (!this.initialized) return
+    const auditionNote = role === 'pulse' ? 'C1' : role === 'texture' ? null : note
+    this.sources[role]?.trigger(auditionNote, Tone.Time('8n').toSeconds(), Tone.now(), 0.55)
+  }
   async startRecording(): Promise<void> { if (!this.recorder || this.recording) return; await this.recorder.start(); this.recording = true }
   async stopRecording(): Promise<Blob | null> { if (!this.recorder || !this.recording) return null; const blob = await this.recorder.stop(); this.recording = false; return blob }
-  panic(): void { this.stop(); this.percussion?.triggerRelease(); this.texture?.triggerRelease(); this.heat = 0; this.exhaustion = 0; this.callbacks.onExhaustion(0) }
+  panic(): void { this.stop(); for (const source of Object.values(this.sources)) source.release(); this.heat = 0; this.exhaustion = 0; this.callbacks.onExhaustion(0) }
 
   dispose(): void {
     this.stop()
     if (this.scheduleId !== null) Tone.getTransport().clear(this.scheduleId)
     this.scheduleId = null
-    this.poly?.dispose(); this.bass?.dispose(); this.percussion?.dispose(); this.texture?.dispose()
+    for (const source of Object.values(this.sources)) source.dispose()
+    this.sources = {}
     for (const channel of Object.values(this.channels)) { channel.filter.dispose(); channel.volume.dispose() }
     this.channels = {}
     this.input?.dispose(); this.drive?.dispose(); this.crusher?.dispose(); this.chorus?.dispose(); this.delay?.dispose(); this.reverb?.dispose(); this.output?.dispose(); this.limiter?.dispose(); this.recorder?.dispose()
-    this.poly = null; this.bass = null; this.percussion = null; this.texture = null; this.initialized = false
+    this.initialized = false
   }
 }

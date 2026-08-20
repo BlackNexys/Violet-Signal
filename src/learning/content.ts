@@ -50,9 +50,9 @@ export const tutorialSteps: TutorialStep[] = [
     selector: '.touch-keyboard', view: 'instrument', mobileDialog: 'top',
   },
   {
-    id: 'shape', eyebrow: '05 · Shape the material', title: 'Core, Body, and Afterimage',
-    body: 'Select a voice, then shape its oscillator, filter, envelope, and channel level. Shared effects place it inside a dark electronic world.',
-    detail: 'Veil adds modulated chorus width; Fracture reduces digital detail. Overclock adds pressure, while performance gestures remain unwritten.',
+    id: 'shape', eyebrow: '05 · Shape the material', title: 'Sound, Layers, Body, and Afterimage',
+    body: 'Choose a voice patch or combine a Primary source with an optional Shadow. Then shape their shared filter, envelope, and channel level.',
+    detail: 'Layer Character changes the synthesis tone. Veil adds chorus width; Fracture reduces digital detail; performance gestures remain unwritten.',
     selector: '.voice-tabs', view: 'instrument',
   },
   {
@@ -133,7 +133,10 @@ export const cheatSections: CheatSection[] = [
   {
     id: 'terms', title: 'Blacklight terms', intro: 'The fiction is always paired with the conventional synthesis idea.',
     items: [
-      { term: 'Core', description: 'Oscillator or source waveform.' },
+      { term: 'Sound', description: 'A versioned voice patch copied into editable composition settings.' },
+      { term: 'Primary', description: 'The required main synthesis layer.' },
+      { term: 'Shadow', description: 'An optional second synthesis layer triggered by the same events.' },
+      { term: 'Character', description: 'A bounded macro for the selected engine tone.' },
       { term: 'Body', description: 'ADSR envelope, velocity, and note duration.' },
       { term: 'Mask', description: 'Selectable low-, band-, or high-pass filter, cutoff, and resonance.' },
       { term: 'Memory', description: 'Delay, repetition, and retained fragments.' },

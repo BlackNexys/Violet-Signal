@@ -1,5 +1,6 @@
 import {
   PATTERN_IDS,
+  applyVoiceRecipe,
   chordSuggestions,
   clamp,
   cloneComposition,
@@ -15,7 +16,7 @@ import {
   type SoundSettings,
   type StyleId,
   type VoiceId,
-  type VoiceSettings,
+  type VoiceRecipe,
 } from './composition'
 
 export type StyleFamily = 'atmospheric' | 'wave' | 'club' | 'breakbeat' | 'industrial' | 'retro' | 'experimental' | 'cinematic'
@@ -31,7 +32,7 @@ export interface StyleDefinition {
   timing: { meter: Meter; stepCount: number; swing: number }
   harmony: { mode: ScaleMode; chordDensity: number }
   sound: Partial<SoundSettings>
-  voices: Partial<Record<VoiceId, Partial<VoiceSettings>>>
+  voices: Partial<Record<VoiceId, VoiceRecipe>>
   rhythm: {
     pulse: number[]
     texture: number[]
@@ -160,9 +161,8 @@ function effectiveStyle(primaryId: string, influences: StyleInfluence[]): StyleD
       const targetVoice = { ...(result.voices[id] ?? {}) }
       if (!sourceVoice) continue
       for (const [rawKey, value] of Object.entries(sourceVoice)) {
-        const key = rawKey as keyof VoiceSettings
-        if (typeof value === 'number' && typeof targetVoice[key] === 'number') {
-          ;(targetVoice as Record<string, unknown>)[key] = mix(targetVoice[key] as number, value, amount)
+        if (typeof value === 'number' && typeof (targetVoice as Record<string, unknown>)[rawKey] === 'number') {
+          ;(targetVoice as Record<string, unknown>)[rawKey] = mix((targetVoice as Record<string, unknown>)[rawKey] as number, value, amount)
         }
       }
       result.voices[id] = targetVoice
@@ -241,12 +241,22 @@ export function applyStyle(
     for (const id of Object.keys(style.voices) as VoiceId[]) {
       const recipe = style.voices[id]
       if (!recipe) continue
+      const resolved: VoiceRecipe = { patchId: null }
       for (const [rawKey, target] of Object.entries(recipe)) {
-        const key = rawKey as keyof VoiceSettings
-        const current = next.voices[id][key]
-        if (typeof current === 'number' && typeof target === 'number') (next.voices[id] as unknown as Record<string, unknown>)[key] = Number(mix(current, target, amount).toFixed(3))
-        else if (amount >= 0.5) (next.voices[id] as unknown as Record<string, unknown>)[key] = target
+        if (rawKey === 'core') {
+          if (amount >= 0.5) resolved.core = target as VoiceRecipe['core']
+          continue
+        }
+        if (rawKey === 'detune' && typeof target === 'number') {
+          resolved.detune = Number(mix(next.voices[id].layers.primary.detune, target, amount).toFixed(3))
+          continue
+        }
+        const current = (next.voices[id] as unknown as Record<string, unknown>)[rawKey]
+        ;(resolved as unknown as Record<string, unknown>)[rawKey] = typeof current === 'number' && typeof target === 'number'
+          ? Number(mix(current, target, amount).toFixed(3))
+          : amount >= 0.5 ? target : current
       }
+      next.voices[id] = applyVoiceRecipe(next.voices[id], resolved, id)
     }
   }
   if (!preserve.patterns) generatePatterns(next, style)

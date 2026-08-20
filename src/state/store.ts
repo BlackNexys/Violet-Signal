@@ -8,6 +8,7 @@ import {
   clonePattern,
   getActivePattern,
   getPattern,
+  isEngineCompatible,
   noteToMidi,
   rotatePattern,
   transposePattern,
@@ -20,8 +21,11 @@ import {
   type Step,
   type StepLane,
   type VoiceId,
+  type LayerSlot,
+  type VoiceLayerSettings,
   type VoiceSettings,
 } from '../model/composition'
+import { applyInstrumentPatch as createPatchedComposition } from '../model/instrumentPacks'
 import { getScene, scenes } from '../model/scenes'
 import { applyStyle as createStyledComposition, type StyleInfluence, type StylePreserve } from '../model/styles'
 
@@ -60,7 +64,9 @@ interface AppState {
   resetScene: () => void
   renameComposition: (name: string) => void
   updateSound: <K extends keyof SoundSettings>(key: K, value: SoundSettings[K]) => void
-  updateVoice: <K extends keyof VoiceSettings>(voice: VoiceId, key: K, value: VoiceSettings[K]) => void
+  updateVoice: <K extends Exclude<keyof VoiceSettings, 'patchId' | 'layers'>>(voice: VoiceId, key: K, value: VoiceSettings[K]) => void
+  updateVoiceLayer: <K extends keyof VoiceLayerSettings>(voice: VoiceId, slot: LayerSlot, key: K, value: VoiceLayerSettings[K]) => void
+  applyInstrumentPatch: (voice: VoiceId, patchId: string) => void
   updateRoot: (key: 'bpm' | 'masterVolume' | 'scaleLock', value: number | boolean) => void
   selectVoice: (voice: VoiceId) => void
   selectStep: (step: number, lane?: StepLane) => void
@@ -172,7 +178,27 @@ export const useAppStore = create<AppState>((set, get) => {
     resetScene: () => get().loadScene(get().currentSceneId === 'custom' ? scenes[0].id : get().currentSceneId),
     renameComposition: (name) => commitMutation((draft) => { draft.name = name.trim() || draft.name }),
     updateSound: (key, value) => commitMutation((draft) => { draft.sound[key] = value }),
-    updateVoice: (voice, key, value) => commitMutation((draft) => { draft.voices[voice][key] = value }),
+    updateVoice: (voice, key, value) => commitMutation((draft) => {
+      ;(draft.voices[voice] as unknown as Record<string, unknown>)[key] = value
+      if (key !== 'mute' && key !== 'solo') draft.voices[voice].patchId = null
+    }),
+    updateVoiceLayer: (voice, slot, key, value) => commitMutation((draft) => {
+      if (key === 'engine' && !isEngineCompatible(voice, value as VoiceLayerSettings['engine'])) return
+      ;(draft.voices[voice].layers[slot] as unknown as Record<string, unknown>)[key] = value
+      if (slot === 'primary') draft.voices[voice].layers.primary.enabled = true
+      draft.voices[voice].patchId = null
+    }),
+    applyInstrumentPatch: (voice, patchId) => {
+      const current = get().composition
+      const next = createPatchedComposition(current, voice, patchId)
+      if (sameComposition(current, next)) return
+      const nextCode = serializeComposition(next)
+      if (get().isPlaying) {
+        set({ code: nextCode, codeError: null, pendingComposition: next, pendingCode: nextCode, currentSceneId: 'custom' })
+        return
+      }
+      set({ composition: next, code: nextCode, codeError: null, pendingComposition: null, pendingCode: null, currentSceneId: 'custom', history: historyWith(get().history, current), future: [] })
+    },
     updateRoot: (key, value) => commitMutation((draft) => {
       if (key === 'bpm' && typeof value === 'number') draft.bpm = value
       if (key === 'masterVolume' && typeof value === 'number') draft.masterVolume = value

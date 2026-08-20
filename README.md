@@ -25,6 +25,12 @@ The headline scenes teach four different starting grammars:
 
 **Veil · chorus width** and **Fracture · bit reduction** are first-class controls in the Instrument, safe notation, step automation, live engine, and offline WAV renderer. Their bounded mappings and creative rationale are documented in [`project-notes/soundverse.md`](project-notes/soundverse.md).
 
+## Layer instrument sounds
+
+Each of the four voices now has a required **Primary** source and an optional **Shadow** source. Pitched voices can use subtractive, FM, or AM synthesis; Pulse uses membrane or noise synthesis; Texture remains procedural noise. Layer altitude, detune, level, Character, and response scales are explicit composition data and render identically in live playback and offline WAV output.
+
+The first built-in sound packs are **Blacklight Core**, which preserves the original calibrated voices, and **Veil Archive**, which introduces the layered **Glass Choir** chord patch and **Undertow** bass patch. Applying a patch is undoable, queues to the selected musical boundary during playback, and becomes **Custom** after manual sound editing. Sound-pack architecture and extension rules are documented in [`project-notes/instrument-packs.md`](project-notes/instrument-packs.md).
+
 ## Run it
 
 Requirements: Node.js 20 or newer and npm.
@@ -66,7 +72,7 @@ The sequencer groups cells according to the selected meter. `/4` beats read `1 e
 
 Four independent patterns can be copied, rotated, transposed, and appended to an arrangement of up to sixteen bars. The transport plays the arrangement in order and shows both the sounding pattern and current arrangement position.
 
-Chord, Bass, Pulse, and Texture voices each have their own waveform, selectable filter type, cutoff and resonance, detune, glide, ADSR envelope, level, mute, and solo settings. Texture is procedurally generated noise; no remote samples are used.
+Chord, Bass, Pulse, and Texture voices each have Primary and optional Shadow layers plus a shared selectable filter, ADSR envelope, level, mute, and solo settings. Every source is synthesized or procedurally generated; no remote samples are used.
 
 ### Add motion and perform
 
@@ -90,6 +96,7 @@ For a complete human- and AI-oriented editing reference—including every accept
 
 ```text
 scene "Rain Behind Glass" {
+  format-version: 2
   style: darkwave
   style-version: 1
   influences: ambient=0.15
@@ -139,7 +146,7 @@ The CodeMirror editor provides syntax coloring, suggestions, formatting, error-l
 - `src/persistence/` — IndexedDB project and automatic-recovery storage.
 - `src/components/` — instrument, step editor, arrangement, automation, code editor, project tools, and transport UI.
 
-The audio graph is created only after a user gesture. Four voice-specific filter/volume channels feed shared drive, parallel bit reduction, stereo chorus, delay, generated reverb, master compensation, and a hard −1 dB limiter. Parameter changes ramp where Tone exposes signal parameters. One transport callback schedules all four voices, applies automation and seeded variations, advances arrangements, and commits queued code at musical boundaries. Scheduled events and nodes are cleared and disposed on unmount.
+The audio graph is created only after a user gesture. A shared source factory builds each voice's Primary and Shadow sources for both live and offline contexts. Four voice-specific filter/volume channels feed shared drive, parallel bit reduction, stereo chorus, delay, generated reverb, master compensation, and a hard −1 dB limiter. Parameter changes ramp where Tone exposes signal parameters. One transport callback schedules all four voices, applies automation and seeded variations, advances arrangements, and commits queued code at musical boundaries. Scheduled events and nodes are cleared and disposed on unmount.
 
 ## Protections
 
@@ -163,4 +170,4 @@ The audio graph is created only after a user gesture. Four voice-specific filter
 
 ## Next valuable milestone
 
-The next release should focus on expressive input and extensibility: MIDI and pointer-drag piano-roll entry, editable pattern names, interpolated automation curves, per-voice stem export, and validated import/export for non-executable style packs.
+Complete the layered catalog with dual-oscillator, metallic, and plucked engines plus the Chrome Wound, Fractured Relay, and Low Cinema packs. After the source vocabulary is stable, expressive MIDI and pointer-drag input, interpolated automation, and per-voice stem export remain strong follow-up work.

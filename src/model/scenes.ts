@@ -1,5 +1,6 @@
 import {
   PATTERN_IDS,
+  applyVoiceRecipe,
   clamp,
   cloneComposition,
   cloneStep,
@@ -9,7 +10,7 @@ import {
   type Composition,
   type Step,
   type VoiceId,
-  type VoiceSettings,
+  type VoiceRecipe,
 } from './composition'
 
 type StepInput = Partial<Step>
@@ -24,8 +25,8 @@ function buildScene(details: {
   scaleRoot: string
   masterVolume: number
   sound: Partial<Composition['sound']>
-  chordVoice?: Partial<Composition['voices']['chords']>
-  voices?: Partial<Record<VoiceId, Partial<VoiceSettings>>>
+  chordVoice?: VoiceRecipe
+  voices?: Partial<Record<VoiceId, VoiceRecipe>>
   arrangement?: Composition['arrangement']
   steps: StepInput[]
 }): Composition {
@@ -38,9 +39,9 @@ function buildScene(details: {
   base.scaleRoot = details.scaleRoot
   base.masterVolume = details.masterVolume
   base.sound = { ...base.sound, ...details.sound }
-  base.voices.chords = { ...base.voices.chords, ...details.chordVoice }
-  for (const [id, settings] of Object.entries(details.voices ?? {}) as Array<[VoiceId, Partial<VoiceSettings>]>) {
-    base.voices[id] = { ...base.voices[id], ...settings }
+  base.voices.chords = applyVoiceRecipe(base.voices.chords, details.chordVoice ?? {}, 'chords')
+  for (const [id, settings] of Object.entries(details.voices ?? {}) as Array<[VoiceId, VoiceRecipe]>) {
+    base.voices[id] = applyVoiceRecipe(base.voices[id], settings, id)
   }
   const patternA = base.patterns[0]
   patternA.steps = patternA.steps.map((step, index) => ({

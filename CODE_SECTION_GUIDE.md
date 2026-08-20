@@ -26,6 +26,7 @@ A scene begins with a quoted name, contains `control: value` lines, and ends wit
 
 ```text
 scene "Your Scene Name" {
+  format-version: 2
   style: darkwave
   style-version: 1
   influences: ambient=0.2
@@ -63,6 +64,7 @@ For example, in 4/4 steps `01 05 09 13` are the four quarter-note downbeats. Ste
 
 | Control | Accepted value | Meaning |
 | --- | --- | --- |
+| `format-version` | Whole number `1`–`2` | Composition schema. The app currently writes `2`; missing values import as legacy v1. |
 | `style` | Any built-in style id | Primary production vocabulary. `world` remains accepted for older projects. |
 | `style-version` | Whole number `1`–`999` | Recipe schema version written by the app; normally leave it unchanged. |
 | `influences` | `style-id=0..0.8`, or `none` | Optional secondary style blend; the Style Lab currently writes one influence. |
@@ -84,18 +86,24 @@ WAV export reproduces the written gain staging and effects, then peak-normalizes
 
 ## Voice configuration
 
-There are four voices: `chords`, `bass`, `pulse`, and `texture`. A voice line begins with its waveform and then uses space-separated `setting=value` tokens.
+There are four voices: `chords`, `bass`, `pulse`, and `texture`. Each has a required Primary layer and an optional Shadow layer. A voice line configures the Primary source and its shared channel; a `layer … shadow` line configures the second source. Old voice lines remain valid and receive the role's original engine with Shadow off.
 
 ```text
-voice chords: triangle filter=lowpass cutoff=2600 resonance=0.8 detune=4 glide=0 volume=-10 attack=0.08 decay=0.5 sustain=0.62 release=1.8 mute=off solo=off
-voice bass: sawtooth filter=lowpass cutoff=780 resonance=2.4 detune=0 glide=0.08 volume=-9 attack=0.01 decay=0.28 sustain=0.48 release=0.65 mute=off solo=off
-voice pulse: sine filter=lowpass cutoff=2100 resonance=0.7 detune=0 glide=0 volume=-16 attack=0.005 decay=0.09 sustain=0 release=0.06 mute=off solo=off
-voice texture: square filter=bandpass cutoff=1500 resonance=1.2 detune=0 glide=0 volume=-23 attack=0.08 decay=0.6 sustain=0.12 release=1.8 mute=off solo=off
+patch chords: veil-archive/glass-choir@1
+voice chords: triangle engine=am octave=0 detune=0 layer-level=-2 character=0.42 attack-scale=1.15 release-scale=1.2 filter=lowpass cutoff=2450 resonance=1.1 glide=0 volume=-13 attack=0.34 decay=0.86 sustain=0.68 release=3.4 mute=off solo=off
+layer chords shadow: on engine=fm waveform=sine octave=1 detune=7 level=-17 character=0.5 attack-scale=1.65 release-scale=1.35
 ```
+
+`patch` records where the settings came from; the explicit voice and layer values are authoritative. Use `patch chords: custom` after hand-authoring a sound. The Instrument does this automatically after manual sound edits.
 
 | Setting | Accepted value | Meaning |
 | --- | --- | --- |
-| First token | `sine`, `triangle`, `square`, or `sawtooth` | Oscillator core. Texture maps these choices to procedural noise colors. |
+| First token | `sine`, `triangle`, `square`, or `sawtooth` | Primary waveform. Noise engines map these choices to procedural noise colors. |
+| `engine` | Chord/Bass: `subtractive`, `fm`, `am`; Pulse: `membrane`, `noise`; Texture: `noise` | Bounded synthesis model compatible with that voice. |
+| `octave` | Whole number `-2`–`2` | Primary pitch shift without editing written notes. |
+| `layer-level` | `-36`–`0` | Primary source level before the voice channel. |
+| `character` | `0`–`1` | Engine-specific tone macro. |
+| `attack-scale` / `release-scale` | `0.25`–`4` | Multiplies the shared envelope for this layer. |
 | `volume` | `-36`–`-4` | Voice level in dB. |
 | `filter` | `lowpass`, `bandpass`, or `highpass` | Filter shape. |
 | `cutoff` | `80`–`12000` | Filter cutoff or center frequency in Hz. |
@@ -108,6 +116,8 @@ voice texture: square filter=bandpass cutoff=1500 resonance=1.2 detune=0 glide=0
 | `release` | `0.03`–`5` | Fade-out time after release. |
 | `mute` | `on` or `off` | Silences this voice. |
 | `solo` | `on` or `off` | Silences every voice that is not soloed. |
+
+Shadow syntax starts with `on` or `off`, followed by `engine`, `waveform`, `octave`, `detune`, `level`, `character`, `attack-scale`, and `release-scale`. Canonical formatting writes every field even when Shadow is off.
 
 Long attacks can make a correctly timed note feel late. For sharp pulse or bass events, keep attack near `0.005`–`0.03`. Longer chord and texture attacks are useful for pads.
 
@@ -311,7 +321,9 @@ The Style Lab can transform tempo, timing, voices, effects, harmony, patterns, a
 | `is not a note I recognize` | Use `C4`, `Eb4`, or `F#3`; keep the note letter uppercase. |
 | `Note length can be…` | Use only `~1`, `~2`, `~3`, `~4`, or `~8`. |
 | `understands on or off` | Boolean settings do not accept `true`, `false`, `yes`, or `no`. |
-| `is not a voice setting` | Use only waveform, filter, cutoff, resonance, detune, glide, volume, ADSR, mute, and solo settings. |
+| `is not a voice setting` | Use the documented Primary/channel settings; put Shadow-only values on a `layer … shadow` line. |
+| `is not available for the … voice` | Choose an engine compatible with Chord/Bass, Pulse, or Texture as listed above. |
+| `is not a layer setting` | Use engine, waveform, octave, detune, level, character, attack-scale, or release-scale. |
 | `not a control in this instrument` | Remove the unknown key or translate it to a supported control. |
 | `scene needs a closing }` | Put one `}` on its own final line. |
 

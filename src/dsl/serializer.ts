@@ -44,12 +44,19 @@ function automationAssignments(pattern: Pattern, target: AutomationTarget): stri
 
 function voiceLine(composition: Composition, id: VoiceId): string {
   const voice = composition.voices[id]
-  return `  voice ${id}: ${voice.core} filter=${voice.filterType} cutoff=${amount(voice.cutoff)} resonance=${amount(voice.resonance)} detune=${amount(voice.detune)} glide=${amount(voice.glide)} volume=${amount(voice.volume)} attack=${amount(voice.attack)} decay=${amount(voice.decay)} sustain=${amount(voice.sustain)} release=${amount(voice.release)} mute=${voice.mute ? 'on' : 'off'} solo=${voice.solo ? 'on' : 'off'}`
+  const layer = voice.layers.primary
+  return `  voice ${id}: ${layer.waveform} engine=${layer.engine} octave=${layer.octave} detune=${amount(layer.detune)} layer-level=${amount(layer.level)} character=${amount(layer.character)} attack-scale=${amount(layer.attackScale)} release-scale=${amount(layer.releaseScale)} filter=${voice.filterType} cutoff=${amount(voice.cutoff)} resonance=${amount(voice.resonance)} glide=${amount(voice.glide)} volume=${amount(voice.volume)} attack=${amount(voice.attack)} decay=${amount(voice.decay)} sustain=${amount(voice.sustain)} release=${amount(voice.release)} mute=${voice.mute ? 'on' : 'off'} solo=${voice.solo ? 'on' : 'off'}`
+}
+
+function shadowLine(composition: Composition, id: VoiceId): string {
+  const layer = composition.voices[id].layers.shadow
+  return `  layer ${id} shadow: ${layer.enabled ? 'on' : 'off'} engine=${layer.engine} waveform=${layer.waveform} octave=${layer.octave} detune=${amount(layer.detune)} level=${amount(layer.level)} character=${amount(layer.character)} attack-scale=${amount(layer.attackScale)} release-scale=${amount(layer.releaseScale)}`
 }
 
 export function serializeComposition(composition: Composition): string {
   const lines = [
     `scene "${composition.name.replace(/"/g, '')}" {`,
+    `  format-version: ${composition.formatVersion}`,
     `  style: ${composition.world}`,
     `  style-version: ${composition.styleVersion}`,
     `  influences: ${composition.styleInfluences.length ? composition.styleInfluences.map((influence) => `${influence.id}=${amount(influence.amount)}`).join(' ') : 'none'}`,
@@ -63,10 +70,18 @@ export function serializeComposition(composition: Composition): string {
     `  patterns: ${PATTERN_IDS.join(' ')}`,
     `  active: ${composition.activePatternId}`,
     `  arrangement: ${composition.arrangement.join(' ')}`,
+    `  patch chords: ${composition.voices.chords.patchId ?? 'custom'}`,
     voiceLine(composition, 'chords'),
+    shadowLine(composition, 'chords'),
+    `  patch bass: ${composition.voices.bass.patchId ?? 'custom'}`,
     voiceLine(composition, 'bass'),
+    shadowLine(composition, 'bass'),
+    `  patch pulse: ${composition.voices.pulse.patchId ?? 'custom'}`,
     voiceLine(composition, 'pulse'),
+    shadowLine(composition, 'pulse'),
+    `  patch texture: ${composition.voices.texture.patchId ?? 'custom'}`,
     voiceLine(composition, 'texture'),
+    shadowLine(composition, 'texture'),
     `  memory: ${amount(composition.sound.memory)}`,
     `  environment: ${amount(composition.sound.environment)}`,
     `  veil: ${amount(composition.sound.veil)}`,

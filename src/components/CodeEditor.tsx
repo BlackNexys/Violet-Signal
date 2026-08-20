@@ -6,6 +6,7 @@ import { useEffect, useRef } from 'react'
 import { activeTokenRanges } from '../dsl/serializer'
 import type { PatternId } from '../model/composition'
 import { STYLE_DEFINITIONS } from '../model/styles'
+import { INSTRUMENT_PATCHES } from '../model/instrumentPacks'
 
 interface CodeEditorProps {
   value: string
@@ -52,13 +53,15 @@ function matcherPlugin(regexp: RegExp, className: string) {
   }), { decorations: (plugin) => plugin.decorations })
 }
 
-const keywordHighlights = matcherPlugin(/\b(scene|track|style|style-version|world|influences|tempo|meter|steps|swing|seed|scale|lock|patterns|active|arrangement|voice|memory|environment|veil|fracture|ghost|humanize|overclock|output|notes|bass|pulse|texture|emphasis|chance|ratchet|shift|automate)\b/g, 'cm-dsl-keyword')
+const keywordHighlights = matcherPlugin(/\b(scene|track|format-version|style|style-version|world|influences|tempo|meter|steps|swing|seed|scale|lock|patterns|active|arrangement|patch|voice|layer|shadow|memory|environment|veil|fracture|ghost|humanize|overclock|output|notes|bass|pulse|texture|emphasis|chance|ratchet|shift|automate)\b/g, 'cm-dsl-keyword')
 const noteHighlights = matcherPlugin(/\b[A-G](?:#|b)?-?\d\b/g, 'cm-dsl-note')
 const patternHighlights = matcherPlugin(/\b(?:A|B|C|D)\b/g, 'cm-dsl-pattern')
 
 const completions = [
-  ...STYLE_DEFINITIONS.map((style) => `style: ${style.id}`), 'style-version: 1', 'influences: ambient=0.25', 'tempo: ', 'meter: 4/4', 'steps: 16', 'swing: 0.08', 'seed: ', 'scale: C minor', 'lock: on', 'patterns: A B C D', 'active: A',
-  'arrangement: A A B C', 'voice chords: triangle filter=lowpass cutoff=2800 resonance=0.8 detune=0 glide=0 volume=-10 attack=0.05 decay=0.38 sustain=0.58 release=1.4 mute=off solo=off',
+  'format-version: 2', ...STYLE_DEFINITIONS.map((style) => `style: ${style.id}`), 'style-version: 1', 'influences: ambient=0.25', 'tempo: ', 'meter: 4/4', 'steps: 16', 'swing: 0.08', 'seed: ', 'scale: C minor', 'lock: on', 'patterns: A B C D', 'active: A',
+  ...INSTRUMENT_PATCHES.map((patch) => `patch ${patch.role}: ${patch.id}`),
+  'arrangement: A A B C', 'voice chords: triangle engine=subtractive octave=0 detune=0 layer-level=0 character=0.28 attack-scale=1 release-scale=1 filter=lowpass cutoff=2800 resonance=0.8 glide=0 volume=-10 attack=0.05 decay=0.38 sustain=0.58 release=1.4 mute=off solo=off',
+  'layer chords shadow: off engine=subtractive waveform=triangle octave=0 detune=0 level=-18 character=0.28 attack-scale=1 release-scale=1',
   'notes A: 01=C4+Eb4+G4~4', 'bass A: 01=C2~4', 'pulse A: 01 05 09 13', 'texture A: none',
   'chance A: 07=0.65', 'ratchet A: 15=3', 'shift A: 03=-0.08',
   'automate mask A: 01=1200 09=4200', 'automate veil A: 01=0.2 09=0.7', 'automate fracture A: 01=0.05 13=0.65',

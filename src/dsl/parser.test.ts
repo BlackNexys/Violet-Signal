@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { getScene, scenes } from '../model/scenes'
 import { parseComposition } from './parser'
 import { serializeComposition } from './serializer'
+import { FORMAT_VERSION, makeEmptyComposition } from '../model/composition'
+import { applyInstrumentPatch } from '../model/instrumentPacks'
 
 describe('Violet Signal DSL', () => {
   it.each(scenes.map((scene) => [scene.name, scene.id] as const))('round-trips %s without losing composition data', (_, id) => {
@@ -93,11 +95,41 @@ describe('Violet Signal DSL', () => {
     if (!result.ok) return
     expect(result.composition.stepCount).toBe(14)
     expect(result.composition.patterns.every((pattern) => pattern.steps.length === 14)).toBe(true)
-    expect(result.composition.voices.bass).toMatchObject({ filterType: 'bandpass', resonance: 4.2, detune: -7, glide: 0.12 })
+    expect(result.composition.voices.bass).toMatchObject({ filterType: 'bandpass', resonance: 4.2, glide: 0.12 })
+    expect(result.composition.voices.bass.layers.primary.detune).toBe(-7)
+    expect(result.composition.formatVersion).toBe(FORMAT_VERSION)
     expect(result.composition.patterns[0].steps[6].probability).toBe(0.65)
     expect(result.composition.patterns[0].steps[10].ratchets).toBe(3)
     expect(result.composition.patterns[0].steps[2].microShift).toBe(-0.08)
     const roundTrip = parseComposition(serializeComposition(result.composition))
     expect(roundTrip.ok && roundTrip.composition).toEqual(result.composition)
+  })
+
+  it('round-trips explicit layered patches as format v2', () => {
+    const layered = applyInstrumentPatch(makeEmptyComposition(), 'chords', 'veil-archive/glass-choir@1')
+    const result = parseComposition(serializeComposition(layered))
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.composition).toEqual(layered)
+    expect(result.composition.voices.chords.layers).toMatchObject({
+      primary: { engine: 'am', enabled: true },
+      shadow: { engine: 'fm', enabled: true, octave: 1 },
+    })
+  })
+
+  it('rejects an engine that is incompatible with its voice role', () => {
+    const result = parseComposition('scene "Wrong Engine" {\n  voice pulse: sine engine=fm\n}')
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error.message).toContain('not available for the pulse voice')
+  })
+
+  it('marks hand-edited patch settings as custom while keeping explicit values', () => {
+    const layered = applyInstrumentPatch(makeEmptyComposition(), 'chords', 'veil-archive/glass-choir@1')
+    const edited = serializeComposition(layered).replace('character=0.42', 'character=0.43')
+    const result = parseComposition(edited)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.composition.voices.chords.patchId).toBeNull()
+    expect(result.composition.voices.chords.layers.primary.character).toBe(0.43)
   })
 })

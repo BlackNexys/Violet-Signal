@@ -1,0 +1,46 @@
+import { describe, expect, it } from 'vitest'
+import { cloneComposition, FORMAT_VERSION, makeEmptyComposition, type Composition } from './composition'
+import { applyInstrumentPatch, INSTRUMENT_PATCHES, validateInstrumentPatches } from './instrumentPacks'
+
+describe('layered instrument packs', () => {
+  it('contains unique, compatible, bounded built-in patches', () => {
+    expect(validateInstrumentPatches()).toEqual([])
+    expect(new Set(INSTRUMENT_PATCHES.map((patch) => patch.id)).size).toBe(INSTRUMENT_PATCHES.length)
+    expect(INSTRUMENT_PATCHES.map((patch) => patch.id)).toEqual(expect.arrayContaining([
+      'blacklight-core/quiet-circuit@1',
+      'blacklight-core/underline@1',
+      'veil-archive/glass-choir@1',
+      'veil-archive/undertow@1',
+    ]))
+  })
+
+  it('applies a patch without mutating the source composition or registry', () => {
+    const original = makeEmptyComposition()
+    const registryBefore = structuredClone(INSTRUMENT_PATCHES)
+    const next = applyInstrumentPatch(original, 'chords', 'veil-archive/glass-choir@1')
+    expect(original.voices.chords.patchId).toBeNull()
+    expect(next.voices.chords).toMatchObject({ patchId: 'veil-archive/glass-choir@1' })
+    expect(next.voices.chords.layers.shadow).toMatchObject({ enabled: true, engine: 'fm', octave: 1 })
+    expect(INSTRUMENT_PATCHES).toEqual(registryBefore)
+  })
+
+  it('migrates legacy flat voice sources into a primary layer once', () => {
+    const current = makeEmptyComposition()
+    const channel = { ...current.voices.bass } as unknown as Record<string, unknown>
+    delete channel.layers
+    delete channel.patchId
+    const legacy = {
+      ...current,
+      formatVersion: undefined,
+      voices: {
+        ...current.voices,
+        bass: { ...channel, core: 'square', detune: -9 },
+      },
+    } as unknown as Composition
+    const migrated = cloneComposition(legacy)
+    expect(migrated.formatVersion).toBe(FORMAT_VERSION)
+    expect(migrated.voices.bass.layers.primary).toMatchObject({ enabled: true, engine: 'subtractive', waveform: 'square', detune: -9 })
+    expect(migrated.voices.bass.layers.shadow.enabled).toBe(false)
+    expect(cloneComposition(migrated)).toEqual(migrated)
+  })
+})

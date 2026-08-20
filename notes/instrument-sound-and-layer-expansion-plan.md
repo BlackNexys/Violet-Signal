@@ -1,0 +1,497 @@
+# Instrument Sound and Layer Expansion Plan
+
+Status: in progress — first vertical slice completed  
+Date: 2026-08-19  
+Last implementation update: 2026-08-19
+
+## Implementation progress
+
+The first vertical slice is implemented:
+
+- Format-v2 Primary/Shadow voice data and idempotent legacy migration.
+- Shared live/offline sources for subtractive, FM, AM, membrane, and noise engines.
+- Blacklight Core's four compatibility patches plus Veil Archive's Glass Choir and Undertow.
+- Patch selection, editable layer controls, Custom provenance, undo/redo, and queued playback-boundary application.
+- Safe notation, CodeMirror support, IndexedDB/project normalization, documentation, and production-browser layered WAV coverage.
+
+The next slice begins with the Phase 0 profiling gate for dual, metal, and pluck sources, followed by Chrome Wound patches. Fractured Relay and Low Cinema remain later content work.
+
+## Outcome
+
+Expand Violet Signal from four fixed synth voices into four richer, layered instruments without changing the sequencer's beginner-friendly mental model.
+
+The recommended design is:
+
+- Keep the existing **Chord, Bass, Pulse, and Texture** lanes.
+- Give each voice a **Primary** layer and one optional **Shadow** layer.
+- Add a small set of synthesis engines already available in the installed `tone` package.
+- Package authored combinations as versioned, built-in **sound packs** that fit the Blacklight theme.
+- Keep every concrete sound setting serialized so a saved composition does not change when a pack evolves.
+- Preserve deterministic playback, old project compatibility, and live/offline WAV parity.
+
+This creates meaningfully deeper sound without turning Violet Signal into a full DAW or adding more sequencer lanes.
+
+## Why this direction fits the current app
+
+The repository already has a broad musical vocabulary, but a narrow synthesis vocabulary:
+
+| Area | Current state | Consequence |
+| --- | --- | --- |
+| Musical lanes | Four semantic voices: Chord, Bass, Pulse, Texture | The workflow is understandable and worth preserving. |
+| Sound sources | One Tone.js instrument per lane | Styles can change parameters, but often retain a similar underlying timbre. |
+| Oscillators | Sine, triangle, square, saw; Texture maps these to noise colors | Useful fundamentals, but not enough for clearly distinct instruments. |
+| Effects | Drive, bit reduction, chorus, delay, generated reverb, limiter | The shared Blacklight character is already strong. |
+| Style recipes | 19 built-in genre/style recipes | Styles are broad enough; deeper source sounds will make them more convincing. |
+| Rendering | Separate live and offline graphs with shared pure mappings | New sources must be implemented in both paths or extracted into shared builders. |
+| Notation | Four explicit `voice` lines using bounded values | New sound data must remain safe, readable, and backward compatible. |
+
+Relevant implementation seams are `src/model/composition.ts`, `src/model/styles.ts`, `src/audio/engine.ts`, `src/audio/offlineRender.ts`, `src/dsl/parser.ts`, `src/dsl/serializer.ts`, and `src/components/InstrumentPanel.tsx`.
+
+## Product principles
+
+1. **More depth, not more lanes.** Existing notes and steps should trigger richer instruments without requiring a larger sequencer.
+2. **Two layers are enough.** A fixed Primary/Shadow pair is expressive, explainable, and bounded for CPU use.
+3. **Patches are starting points, not locks.** Applying a sound changes explicit settings that remain editable.
+4. **Theme in names, clarity in labels.** “Glass Choir” may be the patch name; “wide AM pad” explains what it does.
+5. **No sample dependency in the first release.** Keep sounds procedural, offline-renderable, and free of asset/licensing concerns.
+6. **One composition, one truth.** Visual controls, notation, project persistence, styles, live playback, and WAV output must agree.
+7. **Old signals still sound like themselves.** Existing projects migrate to a single enabled Primary layer that reproduces the current voice.
+
+## Proposed sound model
+
+### Keep the four musical roles
+
+No new step lanes are required. Chord and Bass retain pitched events; Pulse and Texture retain hit events.
+
+```text
+Sequencer event
+    -> Voice (Chord / Bass / Pulse / Texture)
+        -> Primary layer
+        -> optional Shadow layer
+    -> shared voice filter and level
+    -> Drive -> Fracture -> Veil -> Memory -> Environment -> Limiter
+```
+
+Mute, solo, automation, the voice filter, and the voice level continue to operate at voice/channel level. Layer controls define how the sound is generated before it enters that channel.
+
+### Layer limits
+
+Each voice has exactly two addressable slots:
+
+- **Primary** is always enabled and replaces the current single source.
+- **Shadow** is optional and defaults to disabled for migrated compositions.
+
+Do not support arbitrary layer arrays in the first version. A fixed pair keeps serialization readable, avoids reorder semantics, limits polyphony, and gives the UI stable controls.
+
+### Engine vocabulary
+
+Use engine capabilities already shipped by Tone.js 15.1.22. The UI should show the thematic name followed by a conventional explanation.
+
+| Engine id | UI label | Tone building block | Compatible roles | Character |
+| --- | --- | --- | --- | --- |
+| `subtractive` | Signal — classic synth | `Synth` / `MonoSynth` | Chord, Bass | Familiar analog-like base; migration default. |
+| `fm` | Specter — FM | `FMSynth` | Chord, Bass | Bells, glass, growl, and digital edge. |
+| `am` | Halo — AM | `AMSynth` | Chord, Bass | Hollow, vocal, and slowly moving tones. |
+| `dual` | Twin — dual oscillator | `DuoSynth` | Chord, Bass | Wide detuned stacks and unstable unison. |
+| `pluck` | Wire — physical pluck | `PluckSynth` or a small managed voice pool | Chord, Bass | Short wire, string, and picked transients. |
+| `membrane` | Impact — membrane | `MembraneSynth` | Pulse | Current kick/tom foundation. |
+| `metal` | Shard — metallic | `MetalSynth` | Pulse, Texture | Hats, clangs, relays, and industrial accents. |
+| `noise` | Weather — noise | `NoiseSynth` | Pulse, Texture | Brown, pink, or white noise bodies. |
+
+Engine compatibility should be enforced in the model, parser, UI, and pack validator. Unsupported combinations must never reach the audio graph.
+
+### Common layer controls
+
+Expose a compact common vocabulary rather than every Tone.js engine option:
+
+| Control | Suggested bound | Purpose |
+| --- | --- | --- |
+| `engine` | compatible engine id | Selects the synthesis model. |
+| `waveform` | existing four waveforms | Defines carrier/core shape where meaningful; maps to noise color for noise. |
+| `octave` | `-2` to `2`, whole numbers | Separates layers musically without editing notes. |
+| `detune` | `-100` to `100` cents | Adds drift or intentional beating. |
+| `level` | `-36` to `0` dB relative | Sets layer balance before the voice channel. |
+| `character` | `0` to `1` | Bounded engine-specific macro such as FM index, AM harmonicity, pluck resonance, or metal brightness. |
+| `attackScale` | `0.25` to `4` | Lets a Shadow arrive before or after the Primary while retaining the voice ADSR. |
+| `releaseScale` | `0.25` to `4` | Lets a layer leave a short edge or long afterimage. |
+| `enabled` | on/off | Applies to Shadow; Primary remains on. |
+
+`character` needs pure mapping functions with named constants and unit tests. It must not be a direct unbounded pass-through into Tone.js.
+
+### Draft model shape
+
+The exact TypeScript naming can change during implementation, but the persisted concept should resemble:
+
+```ts
+type LayerSlot = 'primary' | 'shadow'
+type InstrumentEngine =
+  | 'subtractive' | 'fm' | 'am' | 'dual' | 'pluck'
+  | 'membrane' | 'metal' | 'noise'
+
+interface VoiceLayerSettings {
+  enabled: boolean
+  engine: InstrumentEngine
+  waveform: Waveform
+  octave: number
+  detune: number
+  level: number
+  character: number
+  attackScale: number
+  releaseScale: number
+}
+
+interface VoiceSettings {
+  patchId: string | null
+  layers: Record<LayerSlot, VoiceLayerSettings>
+  cutoff: number
+  attack: number
+  decay: number
+  sustain: number
+  release: number
+  filterType: FilterType
+  resonance: number
+  glide: number
+  volume: number
+  mute: boolean
+  solo: boolean
+}
+```
+
+The existing `core` and `detune` values migrate into the Primary layer. Existing voice filter, envelope, glide, channel level, mute, and solo settings keep their current meaning.
+
+## Sound packs
+
+### Package strategy
+
+“Sound packs” should be an internal, versioned data registry similar to the existing style registry. They are not new npm packages and do not execute code.
+
+No additional runtime dependency is recommended for the first release. React, Zustand, and Tone.js already cover the required UI, state, synthesis, and rendering work. Avoid Tone `Sampler` and remote audio until there is a separate asset, license, loading, caching, and offline-render policy.
+
+Suggested registry concepts:
+
+```ts
+interface SoundPackDefinition {
+  id: string
+  version: number
+  label: string
+  description: string
+  tags: string[]
+  patches: InstrumentPatchDefinition[]
+}
+
+interface InstrumentPatchDefinition {
+  id: string
+  label: string
+  conventionalDescription: string
+  role: VoiceId
+  settings: Partial<VoiceSettings>
+}
+```
+
+Stable identity can use `pack-id/patch-id@version`. Applying a patch copies its concrete bounded settings into the composition. The id remains provenance for the UI, not a runtime lookup required to reproduce the sound. Editing any copied setting marks it **Custom** while retaining the concrete data.
+
+### Proposed built-in catalog
+
+The names carry atmosphere; each UI entry must also include the plain-language descriptor shown here.
+
+| Pack | Chord patch | Bass patch | Pulse patch | Texture patch |
+| --- | --- | --- | --- | --- |
+| **Blacklight Core** | Quiet Circuit — classic poly synth | Underline — mono synth | Heart Signal — membrane hit | Rain Carrier — filtered noise |
+| **Veil Archive** | Glass Choir — AM/FM pad | Undertow — sine/FM sub | Ritual Knock — deep layered membrane | Wet Glass — pink/brown noise wash |
+| **Chrome Wound** | Razor Assembly — detuned dual saw | Reactor — FM/subtractive growl | Iron Pulse — membrane and metallic attack | Arc Ash — bright metallic/noise debris |
+| **Fractured Relay** | Bit Apparition — square/FM keys | Wire Below — short physical pluck | Relay Click — clipped metal transient | Data Dust — gated white-noise fragments |
+| **Low Cinema** | Eclipse Bloom — slow dual/AM pad | Low Omen — layered sine drone | Distant Impact — softened membrane boom | Black Snow — long dark noise bed |
+
+The initial delivery should include **Blacklight Core**, **Veil Archive**, and **Chrome Wound**: four migrated patches plus eight genuinely new patches. Fractured Relay and Low Cinema form the second content slice after performance and live/offline parity are proven.
+
+### Relationship to styles
+
+Styles and sound packs remain separate:
+
+- A **style** can change tempo, timing, harmony, patterns, arrangement, voices, and effects.
+- A **sound patch** changes one voice's synthesis and channel settings only.
+- A **sound pack** groups related patches; it never changes notes or rhythm.
+
+Style definitions may reference recommended patch ids in their voice recipes. The existing **Preserve voice design** switch must preserve the full layered voice configuration. Applying a style writes explicit values, so a later pack update cannot silently alter an existing composition.
+
+## Instrument interface
+
+### Patch selection
+
+Add a compact **Sound** selector above the existing Core block for the selected voice:
+
+- Browse by pack and voice-compatible patch.
+- Show patch name, conventional description, and two or three character tags.
+- Apply immediately when stopped, or through the existing queued musical-boundary behavior while playing.
+- Offer **Reset patch** separately from the existing scene/style reset behavior.
+- Show **Custom** after a user changes a sound-defining value.
+
+Patch browsing should live in the Instrument workspace, not in the sequencer. A drawer or restrained popover is preferable to adding twenty permanent buttons.
+
+### Layer rack
+
+Replace the single-source “Core” presentation with one calibrated module:
+
+- Primary and Shadow rows with an explicit on/off state for Shadow.
+- Engine, waveform/color, octave, drift, level, and Character.
+- The existing Mask/Focus filter and Body ADSR remain voice-level controls below the layer rows.
+- Detailed layer response scales can live in an **Advanced** disclosure; patches can set them even when collapsed.
+- Audition plays the fully layered selected voice.
+
+Do not use a different bright color for every engine. Follow the Blacklight system: violet for selected/live state, data-cool sparingly for layer linkage, amber for a pending engine rebuild, and red only for failure or destructive state.
+
+### Beginner language
+
+Use thematic terms with conventional sublabels:
+
+- **Shadow** — second sound layer
+- **Character** — engine tone
+- **Altitude** — octave shift, if the conventional “Octave” label remains visible
+- **Drift** — detune
+- **Body** — envelope
+- **Mask / Focus** — filter cutoff / resonance
+
+The selected patch description should explain the audible result rather than expose implementation details.
+
+## Safe notation and persistence
+
+### Versioning
+
+Introduce a composition/format version distinct from the existing style recipe version. Local IndexedDB projects and `.violet` files need the same migration path.
+
+- Missing format version means legacy v1.
+- v1 voices migrate to the role's current engine as Primary plus a disabled Shadow.
+- v2 serializes both layer slots explicitly.
+- Parsing an old v1 scene should serialize to canonical v2 after it is accepted.
+- Never use `style-version` as the composition schema version.
+
+### Draft notation
+
+Keep the current voice line recognizable and add explicit layer lines. One possible canonical form is:
+
+```text
+format-version: 2
+patch chords: veil-archive/glass-choir@1
+voice chords: sawtooth engine=am filter=lowpass cutoff=2400 resonance=1.2 volume=-12 attack=0.35 decay=0.9 sustain=0.7 release=3.4 glide=0 mute=off solo=off
+layer chords shadow: on engine=fm waveform=sine octave=1 detune=7 level=-16 character=0.42 attack-scale=1.6 release-scale=1.25
+```
+
+Final grammar should follow these rules:
+
+- Existing v1 `voice` lines remain accepted unchanged.
+- Unknown engines, incompatible role/engine pairs, and out-of-range layer controls return friendly line-specific errors.
+- `patch` is descriptive provenance; explicit voice/layer values are the sound source of truth.
+- Canonical serialization always includes the Shadow line, even when it is off.
+- Editor completion, syntax highlighting, formatting, change summaries, the Code guide, and parser tests ship together.
+
+## Audio architecture
+
+### Shared source adapters
+
+Do not add another set of engine-specific branches independently to both renderers. Introduce a shared source abstraction used by the live and offline graph builders.
+
+Suggested modules:
+
+- `src/audio/instrumentMappings.ts` — pure bounded Character and layer mappings.
+- `src/audio/instrumentSource.ts` — typed adapter interface for update, trigger, release, and dispose.
+- `src/audio/instrumentFactory.ts` — creates Tone source adapters by engine and role.
+- `src/audio/voiceGraph.ts` — creates the two layers, layer gains, and shared voice filter/channel.
+- `src/model/instrumentPacks.ts` — validated built-in pack and patch registry.
+- `src/model/migrations.ts` — explicit persisted-composition migrations.
+
+Live and offline rendering still create their own Tone nodes in the active Tone context, but they share:
+
+- engine option mapping;
+- event-to-trigger mapping;
+- pitch transposition;
+- layer gain and envelope scaling;
+- compatibility checks;
+- gain staging constants;
+- disposal behavior and source metadata.
+
+### Runtime changes
+
+Numeric edits should ramp smoothly. Changing an engine usually requires node replacement; queue that replacement to the existing selected musical boundary, crossfade briefly if practical, then dispose the old node. Avoid rebuilding the whole graph for waveform, level, detune, or Character changes when the Tone source can update safely.
+
+All layer nodes and temporary crossfade gains must be tracked and disposed on panic/unmount. Tests should detect repeated engine switching that leaks graph objects or schedules duplicate triggers.
+
+### Gain and polyphony budget
+
+Layering must not simply double loudness.
+
+- Add a conservative per-layer trim before the voice channel.
+- Default Shadow level should sit clearly below Primary.
+- Preserve the current input trim, output compensation, and hard `-1 dB` limiter.
+- Cap pitched polyphony across both Chord layers; begin with a total budget comparable to the current maximum rather than doubling it blindly.
+- Drop oldest release tails before current attacks when the cap is reached.
+- Exercise maximum chord size, ratchet count, long releases, Overclock, and both layers during profiling.
+
+## Delivery plan
+
+### Phase 0 — Sound and CPU spike
+
+- Prototype `subtractive`, `fm`, `am`, `dual`, `membrane`, `metal`, and `noise` adapters outside the UI.
+- Confirm which engines update without reconstruction and which require replacement.
+- Test two-layer chords at maximum practical chord size and ratchets in current supported browsers.
+- Decide whether `pluck` meets polyphony, lifecycle, and offline parity requirements; defer it if a managed pool is not reliable.
+- Tune initial engine mappings and layer trim using normalized loudness comparisons, not peak alone.
+
+Exit: an engine compatibility matrix, CPU/polyphony budget, and four approved representative sounds.
+
+### Phase 1 — Model, migration, and pack registry
+
+- Add format versioning and Primary/Shadow layer types.
+- Implement one idempotent v1-to-v2 migration for local projects and parsed notation.
+- Add compatible-engine validation and bounded defaults per voice role.
+- Build the sound-pack registry with Blacklight Core, Veil Archive, and Chrome Wound.
+- Add pure patch application that participates in composition undo/redo and boundary queuing.
+- Extend style recipes and Preserve voice design behavior to carry layered voices.
+
+Exit: all old fixtures migrate; all pack definitions validate; patch application is deterministic and serializable.
+
+### Phase 2 — Shared audio graph and live playback
+
+- Implement the source adapters, factory, and two-layer voice graph.
+- Route both layers through the existing voice filter/level and shared effects.
+- Update audition, sequencer triggering, mute/solo, automation, panic, and disposal.
+- Add safe engine replacement at musical boundaries.
+- Verify Ghost, Chance, ratchets, Humanize, Pressure, Freeze Memory, and Overclock still behave as designed.
+
+Exit: all twelve initial patches play live without clicks, stuck notes, duplicate scheduling, or graph leaks.
+
+### Phase 3 — Offline WAV parity
+
+- Create offline voices through the same factories and mappings.
+- Ensure deterministic scheduling, layer pitch offsets, Character mappings, and layer gains match live playback.
+- Retain stereo 44.1 kHz WAV output and peak normalization.
+- Add automated render assertions for silence, finite samples, channel count, peak ceiling, duration, and deterministic output.
+- Perform listening comparisons for every initial patch and representative automation/Overclock cases.
+
+Exit: every supported engine and initial patch renders; no patch is live-only.
+
+### Phase 4 — Instrument UI
+
+- Add the voice-compatible patch browser and Custom state.
+- Add the Primary/Shadow layer rack with restrained advanced controls.
+- Preserve keyboard navigation, visible focus, reduced motion, 320 px reflow, and practical touch targets.
+- Extend tutorial/cheatsheet content with the shortest useful explanation of patches and Shadow layers.
+- Keep the existing voice filter, Body, shared effects, performance gestures, and keyboard visually subordinate to the selected sound task.
+
+Exit: a beginner can select a patch, enable a Shadow, balance it, audition it, undo it, and understand what changed without opening Code.
+
+### Phase 5 — Notation, editor, and documentation
+
+- Parse and serialize format version, patch provenance, engine, and Shadow settings.
+- Keep all v1 examples valid and add v2 round-trip fixtures.
+- Update CodeMirror completions, syntax ranges, error messages, formatting, and change summaries.
+- Update `CODE_SECTION_GUIDE.md`, `README.md`, and the live/offline rendering note.
+- Add a focused sound-pack extension contract beside the existing style-system documentation.
+
+Exit: UI edits and Code edits round-trip exactly, and a saved project reopens with the same sound.
+
+### Phase 6 — Content expansion and hardening
+
+- Add Fractured Relay and Low Cinema after the architecture passes performance checks.
+- Retune selected built-in styles and headline scenes to reference layered patches where the change is musically meaningful.
+- Do not layer every scene by default; contrast is more valuable than constant density.
+- Run the full unit, lint, build, and production-browser smoke suites.
+- Test import of old `.violet` files and old IndexedDB snapshots in addition to clean projects.
+
+Exit: twenty total built-in patches, backward compatibility, accessible UI, and stable live/offline behavior.
+
+## Test matrix
+
+### Model and packs
+
+- Unique stable pack and patch ids.
+- Valid versions, roles, engines, bounds, and enabled states.
+- Deep clone behavior for nested layers.
+- Patch application never mutates the registry or input composition.
+- Manual edits move patch provenance to Custom.
+- Preserve voice design includes patch, Primary, Shadow, channel, and envelope settings.
+
+### Migration and notation
+
+- Current compositions migrate to equivalent one-layer v2 voices.
+- Migration is idempotent.
+- Existing scene and parser fixtures remain valid.
+- v2 notation round-trips without dropping layer data.
+- Friendly errors cover unknown packs, unknown engines, role incompatibility, and every bound.
+- Removed lines return to deterministic defaults rather than inheriting hidden state.
+
+### Audio behavior
+
+- Every engine can initialize, update, trigger, release, panic, and dispose.
+- Pitched octave offsets preserve valid note bounds.
+- Mute/solo applies to both layers.
+- Automation affects the shared channel exactly once.
+- Repeated engine changes create no duplicate trigger or stale scheduled event.
+- Offline renders are deterministic for a fixed seed and configuration.
+- Maximum-density scenes stay finite and within the limiter contract.
+
+### UI and accessibility
+
+- Voice tabs filter incompatible patches.
+- Layer enabled state and current slot are not communicated by color alone.
+- Patch application, manual layer edits, undo, and redo remain synchronized with Code.
+- Keyboard focus order is logical through patch, layer, filter, envelope, and effects controls.
+- Narrow-screen layout does not hide Primary/Shadow identity or current values.
+
+## Risks and mitigations
+
+| Risk | Mitigation |
+| --- | --- |
+| Layering overwhelms the simple instrument UI | Fixed two-slot rack, collapsed advanced controls, role-filtered patches, and shared voice controls. |
+| CPU spikes with dual polyphonic layers | Profile first, cap total polyphony, conservative releases, and postpone engines that need costly manual pooling. |
+| Live and WAV output diverge | Shared factories/mappings/event plans plus per-engine offline tests before UI completion. |
+| Existing projects change sound | Explicit v1 migration to current engines with Shadow disabled; regression fixtures from current scenes. |
+| Patches become opaque presets | Serialize concrete values and expose common controls; patch id is provenance only. |
+| Too many engine-specific parameters leak into the model | One bounded Character macro per layer with pure documented mappings. |
+| Layer gain drives distortion/limiting unintentionally | Layer trim, Shadow defaults below Primary, stress renders, and comparison at controlled loudness. |
+| Sound-pack imports become a security/versioning project | Built-in data only for this milestone; external pack import remains a later validated-data feature. |
+
+## Decisions made by this plan
+
+- Keep four sequencer lanes.
+- Use two layers per voice, not arbitrary layer counts.
+- Use Tone.js engines already installed; add no new runtime package initially.
+- Remain synthesized/procedural and sample-free for this milestone.
+- Treat sound packs as versioned data registries separate from styles.
+- Serialize explicit sound settings, with patch ids used only as provenance.
+- Introduce a real composition format version and migrate old data.
+- Require live/offline parity before expanding the full content catalog.
+
+## Deliberate non-goals
+
+- Additional sequencer tracks or a mixer with arbitrary channels.
+- User-uploaded samples, remote sample libraries, or Tone `Sampler` presets.
+- Third-party sound-pack import in the first release.
+- Arbitrary modulation routing or a modular patching canvas.
+- Per-layer effects chains, automation lanes, mute, or solo.
+- More than two layers per voice.
+- A complete acoustic-instrument emulation library.
+
+## Definition of done
+
+This expansion is complete when:
+
+- Old projects and `.violet` files load with their expected sound.
+- Each voice can use a Primary and optional Shadow layer.
+- At least twelve initial built-in patches offer audibly distinct, theme-consistent instruments.
+- Patch and layer edits are serializable, undoable, queue safely during playback, and survive reload.
+- All initial engines work in both live playback and offline WAV rendering.
+- Layering remains stable under dense chords, ratchets, long releases, and Overclock.
+- Instrument controls remain understandable, keyboard accessible, responsive, and consistent with the Blacklight style guide.
+- Unit tests, lint, build, and the production-browser smoke test pass.
+
+## Recommended first implementation slice
+
+Build one complete vertical slice before authoring the full library:
+
+1. Add v2 migration and two layer slots.
+2. Implement `subtractive`, `fm`, and `am` pitched adapters plus existing `membrane` and `noise` adapters.
+3. Ship **Quiet Circuit**, **Glass Choir**, **Underline**, and **Undertow**.
+4. Complete live playback, offline rendering, notation round-trip, UI selection, undo/redo, and persistence for those four patches.
+5. Profile and listen before adding dual, metal, pluck, and the remaining packs.
+
+That slice proves the hard architecture while producing an immediately audible improvement.

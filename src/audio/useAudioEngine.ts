@@ -25,7 +25,10 @@ export function useAudioEngine() {
   const pause = useCallback(() => { engineRef.current?.pause(); useAppStore.getState().setPlaying(false) }, [])
   const stop = useCallback(() => { engineRef.current?.stop(); useAppStore.getState().setPlaying(false) }, [])
   const panic = useCallback(() => { engineRef.current?.panic(); useAppStore.getState().setPlaying(false) }, [])
-  const audition = useCallback(async (note: string) => { await enable(); engineRef.current?.audition(note) }, [enable])
+  const audition = useCallback(async (note: string) => {
+    await enable()
+    engineRef.current?.audition(note, useAppStore.getState().selectedVoice)
+  }, [enable])
   const startCapture = useCallback(async () => { await enable(); await engineRef.current?.startRecording() }, [enable])
   const stopCapture = useCallback(async () => engineRef.current?.stopRecording() ?? null, [])
   return { enable, play, pause, stop, panic, audition, startCapture, stopCapture }

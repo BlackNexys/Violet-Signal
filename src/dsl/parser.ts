@@ -1,8 +1,10 @@
 import {
   PATTERN_IDS,
+  FORMAT_VERSION,
   METERS,
   STEP_COUNT_OPTIONS,
   isNote,
+  isEngineCompatible,
   makeEmptyComposition,
   noteToMidi,
   resizeComposition,
@@ -11,12 +13,15 @@ import {
   type PatternId,
   type ScaleMode,
   type FilterType,
+  type InstrumentEngine,
   type Meter,
   type VoiceId,
   type VoiceSettings,
+  type VoiceLayerSettings,
   type Waveform,
 } from '../model/composition'
 import { STYLE_DEFINITIONS, isStyleId } from '../model/styles'
+import { getInstrumentPatch } from '../model/instrumentPacks'
 
 export interface FriendlyParseError { line: number; message: string; excerpt: string }
 export type ParseResult = { ok: true; composition: Composition } | { ok: false; error: FriendlyParseError }
@@ -28,6 +33,7 @@ class DslError extends Error {
 const WAVEFORMS: Waveform[] = ['sine', 'triangle', 'square', 'sawtooth']
 const FILTER_TYPES: FilterType[] = ['lowpass', 'highpass', 'bandpass']
 const VOICES: VoiceId[] = ['chords', 'bass', 'pulse', 'texture']
+const ENGINES: InstrumentEngine[] = ['subtractive', 'fm', 'am', 'membrane', 'noise']
 const STYLE_IDS = STYLE_DEFINITIONS.map((style) => style.id)
 function fail(message: string, line: number, excerpt: string): never { throw new DslError(message, line, excerpt) }
 function slugify(name: string) { return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'untitled-signal' }
@@ -71,13 +77,20 @@ function parseHits(value: string, stepCount: number, line: number, excerpt: stri
   })
 }
 
-function parseVoice(value: string, voice: VoiceSettings, line: number, excerpt: string): void {
+function engineFor(raw: string, role: VoiceId, line: number, excerpt: string): InstrumentEngine {
+  if (!ENGINES.includes(raw as InstrumentEngine)) fail(`Engine can be ${ENGINES.join(', ')}.`, line, excerpt)
+  const engine = raw as InstrumentEngine
+  if (!isEngineCompatible(role, engine)) fail(`${engine} is not available for the ${role} voice.`, line, excerpt)
+  return engine
+}
+
+function parseVoice(value: string, role: VoiceId, voice: VoiceSettings, line: number, excerpt: string): void {
   const tokens = value.split(/\s+/).filter(Boolean)
   const waveform = tokens.shift()
   if (!waveform || !WAVEFORMS.includes(waveform as Waveform)) fail(`Voice starts with ${WAVEFORMS.join(', ')}.`, line, excerpt)
-  voice.core = waveform as Waveform
+  voice.layers.primary.waveform = waveform as Waveform
   for (const token of tokens) {
-    const match = /^(volume|cutoff|attack|decay|sustain|release|filter|resonance|detune|glide|mute|solo)=(.+)$/.exec(token)
+    const match = /^(volume|cutoff|attack|decay|sustain|release|filter|resonance|detune|glide|mute|solo|engine|octave|character|layer-level|attack-scale|release-scale)=(.+)$/.exec(token)
     if (!match) fail(`“${token}” is not a voice setting.`, line, excerpt)
     const [, key, raw] = match
     if (key === 'volume') voice.volume = numberIn(raw, 'Voice volume', -36, -4, line, excerpt)
@@ -91,10 +104,47 @@ function parseVoice(value: string, voice: VoiceSettings, line: number, excerpt: 
       voice.filterType = raw as FilterType
     }
     if (key === 'resonance') voice.resonance = numberIn(raw, 'Resonance', 0, 12, line, excerpt)
-    if (key === 'detune') voice.detune = numberIn(raw, 'Detune', -100, 100, line, excerpt)
+    if (key === 'detune') voice.layers.primary.detune = numberIn(raw, 'Detune', -100, 100, line, excerpt)
+    if (key === 'engine') voice.layers.primary.engine = engineFor(raw, role, line, excerpt)
+    if (key === 'octave') {
+      const octave = numberIn(raw, 'Octave', -2, 2, line, excerpt)
+      if (!Number.isInteger(octave)) fail('Octave needs a whole number from -2 to 2.', line, excerpt)
+      voice.layers.primary.octave = octave
+    }
+    if (key === 'character') voice.layers.primary.character = numberIn(raw, 'Character', 0, 1, line, excerpt)
+    if (key === 'layer-level') voice.layers.primary.level = numberIn(raw, 'Layer level', -36, 0, line, excerpt)
+    if (key === 'attack-scale') voice.layers.primary.attackScale = numberIn(raw, 'Attack scale', 0.25, 4, line, excerpt)
+    if (key === 'release-scale') voice.layers.primary.releaseScale = numberIn(raw, 'Release scale', 0.25, 4, line, excerpt)
     if (key === 'glide') voice.glide = numberIn(raw, 'Glide', 0, 0.5, line, excerpt)
     if (key === 'mute') voice.mute = onOff(raw, 'Mute', line, excerpt)
     if (key === 'solo') voice.solo = onOff(raw, 'Solo', line, excerpt)
+  }
+}
+
+function parseLayer(value: string, role: VoiceId, layer: VoiceLayerSettings, line: number, excerpt: string): void {
+  const tokens = value.split(/\s+/).filter(Boolean)
+  const enabled = tokens.shift()
+  if (!enabled) fail('Layer starts with on or off.', line, excerpt)
+  layer.enabled = onOff(enabled, 'Layer', line, excerpt)
+  for (const token of tokens) {
+    const match = /^(engine|waveform|octave|detune|level|character|attack-scale|release-scale)=(.+)$/.exec(token)
+    if (!match) fail(`“${token}” is not a layer setting.`, line, excerpt)
+    const [, key, raw] = match
+    if (key === 'engine') layer.engine = engineFor(raw, role, line, excerpt)
+    if (key === 'waveform') {
+      if (!WAVEFORMS.includes(raw as Waveform)) fail(`Waveform can be ${WAVEFORMS.join(', ')}.`, line, excerpt)
+      layer.waveform = raw as Waveform
+    }
+    if (key === 'octave') {
+      const octave = numberIn(raw, 'Layer octave', -2, 2, line, excerpt)
+      if (!Number.isInteger(octave)) fail('Layer octave needs a whole number from -2 to 2.', line, excerpt)
+      layer.octave = octave
+    }
+    if (key === 'detune') layer.detune = numberIn(raw, 'Layer detune', -100, 100, line, excerpt)
+    if (key === 'level') layer.level = numberIn(raw, 'Layer level', -36, 0, line, excerpt)
+    if (key === 'character') layer.character = numberIn(raw, 'Layer character', 0, 1, line, excerpt)
+    if (key === 'attack-scale') layer.attackScale = numberIn(raw, 'Layer attack scale', 0.25, 4, line, excerpt)
+    if (key === 'release-scale') layer.releaseScale = numberIn(raw, 'Layer release scale', 0.25, 4, line, excerpt)
   }
 }
 
@@ -129,10 +179,27 @@ export function parseComposition(source: string): ParseResult {
       const value = property[2].trim()
       if (!value) fail(`“${property[1]}” is waiting for a value.`, lineNumber, rawLine)
 
+      const patchMatch = /^patch\s+(chords|bass|pulse|texture)$/i.exec(key)
+      if (patchMatch) {
+        const id = patchMatch[1].toLowerCase() as VoiceId
+        if (value.toLowerCase() === 'custom') composition.voices[id].patchId = null
+        else {
+          const patch = getInstrumentPatch(value)
+          if (!patch || patch.role !== id) fail(`“${value}” is not a known ${id} patch.`, lineNumber, rawLine)
+          composition.voices[id].patchId = patch.id
+        }
+        continue
+      }
+      const layerMatch = /^layer\s+(chords|bass|pulse|texture)\s+shadow$/i.exec(key)
+      if (layerMatch) {
+        const id = layerMatch[1].toLowerCase() as VoiceId
+        parseLayer(value, id, composition.voices[id].layers.shadow, lineNumber, rawLine)
+        continue
+      }
       if (key.startsWith('voice ')) {
         const id = key.slice(6) as VoiceId
         if (!VOICES.includes(id)) fail(`“${id}” is not a voice.`, lineNumber, rawLine)
-        parseVoice(value, composition.voices[id], lineNumber, rawLine)
+        parseVoice(value, id, composition.voices[id], lineNumber, rawLine)
         continue
       }
       const laneMatch = /^(notes|bass|pulse|texture|emphasis)\s+([a-d])$/i.exec(key)
@@ -192,6 +259,11 @@ export function parseComposition(source: string): ParseResult {
       }
 
       switch (key) {
+        case 'format-version': {
+          const version = numberIn(value, 'Format version', 1, FORMAT_VERSION, lineNumber, rawLine)
+          if (!Number.isInteger(version)) fail('Format version needs a whole number.', lineNumber, rawLine)
+          composition.formatVersion = FORMAT_VERSION; break
+        }
         case 'tempo': composition.bpm = numberIn(value, 'Tempo', 40, 220, lineNumber, rawLine); break
         case 'style':
         case 'world': {
@@ -256,8 +328,8 @@ export function parseComposition(source: string): ParseResult {
         // Legacy teaching syntax remains importable.
         case 'instrument':
         case 'core':
-          if (value === 'violet-glass') composition.voices.chords.core = 'triangle'
-          else if (WAVEFORMS.includes(value as Waveform)) composition.voices.chords.core = value as Waveform
+          if (value === 'violet-glass') composition.voices.chords.layers.primary.waveform = 'triangle'
+          else if (WAVEFORMS.includes(value as Waveform)) composition.voices.chords.layers.primary.waveform = value as Waveform
           else fail(`Core can be ${WAVEFORMS.join(', ')}.`, lineNumber, rawLine)
           break
         case 'filter':
@@ -313,6 +385,12 @@ export function parseComposition(source: string): ParseResult {
     if (legacyPattern) {
       const palette = legacyPalette ?? ['C4']
       legacyPattern.forEach((active, step) => { composition.patterns[0].steps[step].notes = active ? [...palette] : [] })
+    }
+    for (const id of VOICES) {
+      const patchId = composition.voices[id].patchId
+      if (!patchId) continue
+      const patch = getInstrumentPatch(patchId)
+      if (!patch || JSON.stringify(composition.voices[id]) !== JSON.stringify(patch.settings)) composition.voices[id].patchId = null
     }
     return { ok: true, composition }
   } catch (error) {

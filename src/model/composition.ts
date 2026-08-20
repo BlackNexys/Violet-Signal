@@ -4,6 +4,7 @@ export const STEP_COUNT = DEFAULT_STEP_COUNT
 export const STEP_COUNT_OPTIONS = [8, 12, 14, 16, 20, 24, 28, 32, 64] as const
 export const METERS = ['4/4', '3/4', '6/8', '5/4', '7/8'] as const
 export const PATTERN_IDS = ['A', 'B', 'C', 'D'] as const
+export const FORMAT_VERSION = 2
 
 export type PatternId = (typeof PATTERN_IDS)[number]
 export type Waveform = 'sine' | 'triangle' | 'square' | 'sawtooth'
@@ -14,6 +15,8 @@ export type StyleId = string
 export type SoundWorld = StyleId
 export type Meter = (typeof METERS)[number]
 export type VoiceId = 'chords' | 'bass' | 'pulse' | 'texture'
+export type LayerSlot = 'primary' | 'shadow'
+export type InstrumentEngine = 'subtractive' | 'fm' | 'am' | 'membrane' | 'noise'
 export type NoteLane = 'notes' | 'bass'
 export type StepLane = NoteLane | 'drum' | 'texture'
 export type AutomationTarget = 'mask' | 'memory' | 'veil' | 'fracture' | 'ghost' | 'overclock'
@@ -32,8 +35,21 @@ export interface Step {
   microShift: number
 }
 
+export interface VoiceLayerSettings {
+  enabled: boolean
+  engine: InstrumentEngine
+  waveform: Waveform
+  octave: number
+  detune: number
+  level: number
+  character: number
+  attackScale: number
+  releaseScale: number
+}
+
 export interface VoiceSettings {
-  core: Waveform
+  patchId: string | null
+  layers: Record<LayerSlot, VoiceLayerSettings>
   cutoff: number
   attack: number
   decay: number
@@ -41,7 +57,6 @@ export interface VoiceSettings {
   release: number
   filterType: FilterType
   resonance: number
-  detune: number
   glide: number
   volume: number
   mute: boolean
@@ -68,6 +83,7 @@ export interface Pattern {
 }
 
 export interface Composition {
+  formatVersion: number
   id: string
   name: string
   world: SoundWorld
@@ -124,9 +140,62 @@ export const makeAutomationLanes = (stepCount = DEFAULT_STEP_COUNT): AutomationL
   overclock: Array.from({ length: stepCount }, () => null),
 })
 
-function makeVoice(overrides: Partial<VoiceSettings> = {}): VoiceSettings {
+const DEFAULT_WAVEFORMS: Record<VoiceId, Waveform> = {
+  chords: 'triangle',
+  bass: 'triangle',
+  pulse: 'sine',
+  texture: 'sawtooth',
+}
+
+const DEFAULT_ENGINES: Record<VoiceId, InstrumentEngine> = {
+  chords: 'subtractive',
+  bass: 'subtractive',
+  pulse: 'membrane',
+  texture: 'noise',
+}
+
+export const ENGINES_BY_VOICE: Record<VoiceId, InstrumentEngine[]> = {
+  chords: ['subtractive', 'fm', 'am'],
+  bass: ['subtractive', 'fm', 'am'],
+  pulse: ['membrane', 'noise'],
+  texture: ['noise'],
+}
+
+export interface VoiceRecipe extends Partial<Omit<VoiceSettings, 'patchId' | 'layers'>> {
+  patchId?: string | null
+  core?: Waveform
+  detune?: number
+  engine?: InstrumentEngine
+  primary?: Partial<VoiceLayerSettings>
+  shadow?: Partial<VoiceLayerSettings>
+}
+
+export function isEngineCompatible(voice: VoiceId, engine: InstrumentEngine): boolean {
+  return ENGINES_BY_VOICE[voice].includes(engine)
+}
+
+export function makeVoiceLayer(voice: VoiceId, slot: LayerSlot, overrides: Partial<VoiceLayerSettings> = {}): VoiceLayerSettings {
   return {
-    core: 'triangle',
+    enabled: slot === 'primary',
+    engine: DEFAULT_ENGINES[voice],
+    waveform: DEFAULT_WAVEFORMS[voice],
+    octave: 0,
+    detune: 0,
+    level: slot === 'primary' ? 0 : -18,
+    character: 0.28,
+    attackScale: 1,
+    releaseScale: 1,
+    ...overrides,
+  }
+}
+
+export function makeVoiceSettings(voice: VoiceId, overrides: VoiceRecipe = {}): VoiceSettings {
+  const settings: VoiceSettings = {
+    patchId: overrides.patchId ?? null,
+    layers: {
+      primary: makeVoiceLayer(voice, 'primary'),
+      shadow: makeVoiceLayer(voice, 'shadow'),
+    },
     cutoff: 2800,
     attack: 0.05,
     decay: 0.38,
@@ -134,13 +203,32 @@ function makeVoice(overrides: Partial<VoiceSettings> = {}): VoiceSettings {
     release: 1.4,
     filterType: 'lowpass',
     resonance: 0.7,
-    detune: 0,
     glide: 0,
     volume: -10,
     mute: false,
     solo: false,
-    ...overrides,
   }
+  return applyVoiceRecipe(settings, overrides, voice)
+}
+
+export function applyVoiceRecipe(settings: VoiceSettings, recipe: VoiceRecipe, voice: VoiceId): VoiceSettings {
+  const next: VoiceSettings = {
+    ...settings,
+    layers: {
+      primary: { ...settings.layers.primary },
+      shadow: { ...settings.layers.shadow },
+    },
+  }
+  for (const [key, value] of Object.entries(recipe)) {
+    if (value === undefined || ['core', 'detune', 'engine', 'primary', 'shadow'].includes(key)) continue
+    ;(next as unknown as Record<string, unknown>)[key] = value
+  }
+  if (recipe.core !== undefined) next.layers.primary.waveform = recipe.core
+  if (recipe.detune !== undefined) next.layers.primary.detune = recipe.detune
+  if (recipe.engine !== undefined && isEngineCompatible(voice, recipe.engine)) next.layers.primary.engine = recipe.engine
+  if (recipe.primary) next.layers.primary = { ...next.layers.primary, ...recipe.primary, enabled: true }
+  if (recipe.shadow) next.layers.shadow = { ...next.layers.shadow, ...recipe.shadow }
+  return next
 }
 
 export const makeEmptyPattern = (id: PatternId, stepCount = DEFAULT_STEP_COUNT): Pattern => ({
@@ -151,6 +239,7 @@ export const makeEmptyPattern = (id: PatternId, stepCount = DEFAULT_STEP_COUNT):
 })
 
 export const makeEmptyComposition = (): Composition => ({
+  formatVersion: FORMAT_VERSION,
   id: 'untitled-signal',
   name: 'Untitled Signal',
   world: 'darkwave',
@@ -167,10 +256,10 @@ export const makeEmptyComposition = (): Composition => ({
   scaleMode: 'minor',
   sound: { ...DEFAULT_SOUND_SETTINGS },
   voices: {
-    chords: makeVoice(),
-    bass: makeVoice({ core: 'triangle', cutoff: 950, attack: 0.012, decay: 0.3, sustain: 0.5, release: 0.7, volume: -9 }),
-    pulse: makeVoice({ core: 'sine', cutoff: 2100, attack: 0.005, decay: 0.09, sustain: 0, release: 0.06, volume: -16 }),
-    texture: makeVoice({ core: 'sawtooth', cutoff: 1400, attack: 0.08, decay: 0.6, sustain: 0.12, release: 1.8, volume: -22 }),
+    chords: makeVoiceSettings('chords'),
+    bass: makeVoiceSettings('bass', { core: 'triangle', cutoff: 950, attack: 0.012, decay: 0.3, sustain: 0.5, release: 0.7, volume: -9 }),
+    pulse: makeVoiceSettings('pulse', { core: 'sine', cutoff: 2100, attack: 0.005, decay: 0.09, sustain: 0, release: 0.06, volume: -16 }),
+    texture: makeVoiceSettings('texture', { core: 'sawtooth', cutoff: 1400, attack: 0.08, decay: 0.6, sustain: 0.12, release: 1.8, volume: -22 }),
   },
   patterns: PATTERN_IDS.map((id) => makeEmptyPattern(id, DEFAULT_STEP_COUNT)),
   activePatternId: 'A',
@@ -274,6 +363,7 @@ export function cloneComposition(composition: Composition): Composition {
   const stepCount = normalizeStepCount(composition.stepCount ?? composition.patterns?.[0]?.steps.length ?? DEFAULT_STEP_COUNT)
   return {
     ...composition,
+    formatVersion: FORMAT_VERSION,
     world: composition.world ?? 'darkwave',
     styleVersion: composition.styleVersion ?? 1,
     styleInfluences: (composition.styleInfluences ?? []).map((influence) => ({ ...influence, amount: clamp(influence.amount, 0, 1) })),
@@ -282,13 +372,51 @@ export function cloneComposition(composition: Composition): Composition {
     swing: clamp(composition.swing ?? 0, 0, 0.75),
     sound: { ...DEFAULT_SOUND_SETTINGS, ...composition.sound },
     voices: {
-      chords: { ...makeVoice(), ...composition.voices.chords },
-      bass: { ...makeVoice({ core: 'triangle', cutoff: 950, volume: -9 }), ...composition.voices.bass },
-      pulse: { ...makeVoice({ core: 'sine', cutoff: 2100, volume: -16 }), ...composition.voices.pulse },
-      texture: { ...makeVoice({ core: 'sawtooth', cutoff: 1400, volume: -22 }), ...composition.voices.texture },
+      chords: normalizeVoice('chords', composition.voices?.chords),
+      bass: normalizeVoice('bass', composition.voices?.bass),
+      pulse: normalizeVoice('pulse', composition.voices?.pulse),
+      texture: normalizeVoice('texture', composition.voices?.texture),
     },
     patterns: composition.patterns.map((pattern) => resizePattern(clonePattern(pattern), stepCount)),
     arrangement: [...composition.arrangement],
+  }
+}
+
+function normalizeVoice(id: VoiceId, input: VoiceSettings | undefined): VoiceSettings {
+  const legacy = (input ?? {}) as VoiceSettings & { core?: Waveform; detune?: number }
+  const defaults = makeVoiceSettings(id, id === 'bass' ? { cutoff: 950, volume: -9 } : id === 'pulse' ? { cutoff: 2100, volume: -16 } : id === 'texture' ? { cutoff: 1400, volume: -22 } : {})
+  const primary = legacy.layers?.primary ?? makeVoiceLayer(id, 'primary', { waveform: legacy.core ?? defaults.layers.primary.waveform, detune: legacy.detune ?? 0 })
+  const shadow = legacy.layers?.shadow ?? makeVoiceLayer(id, 'shadow')
+  const channel = { ...legacy } as unknown as Record<string, unknown>
+  delete channel.core
+  delete channel.detune
+  delete channel.layers
+  delete channel.patchId
+  return {
+    ...defaults,
+    ...channel,
+    patchId: legacy.patchId ?? null,
+    layers: {
+      primary: normalizeLayer(id, 'primary', primary),
+      shadow: normalizeLayer(id, 'shadow', shadow),
+    },
+  }
+}
+
+function normalizeLayer(id: VoiceId, slot: LayerSlot, input: VoiceLayerSettings): VoiceLayerSettings {
+  const fallback = makeVoiceLayer(id, slot)
+  const engine = isEngineCompatible(id, input.engine) ? input.engine : fallback.engine
+  return {
+    ...fallback,
+    ...input,
+    enabled: slot === 'primary' ? true : Boolean(input.enabled),
+    engine,
+    octave: Math.round(clamp(input.octave ?? 0, -2, 2)),
+    detune: clamp(input.detune ?? 0, -100, 100),
+    level: clamp(input.level ?? fallback.level, -36, 0),
+    character: clamp(input.character ?? fallback.character, 0, 1),
+    attackScale: clamp(input.attackScale ?? 1, 0.25, 4),
+    releaseScale: clamp(input.releaseScale ?? 1, 0.25, 4),
   }
 }
 

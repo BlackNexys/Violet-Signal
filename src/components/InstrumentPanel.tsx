@@ -1,6 +1,17 @@
 import { useEffect } from 'react'
 import { Activity, AudioWaveform, CloudRain, Gauge, Radio, RotateCcw, ShieldCheck, Snowflake, Zap } from 'lucide-react'
-import { midiToNote, notesForScale, noteToMidi, type FilterType, type VoiceId, type Waveform } from '../model/composition'
+import {
+  ENGINES_BY_VOICE,
+  midiToNote,
+  notesForScale,
+  noteToMidi,
+  type FilterType,
+  type InstrumentEngine,
+  type LayerSlot,
+  type VoiceId,
+  type Waveform,
+} from '../model/composition'
+import { getInstrumentPatch, patchesForVoice, SOUND_PACKS } from '../model/instrumentPacks'
 import { useAppStore } from '../state/store'
 import { ControlSlider } from './ControlSlider'
 
@@ -14,6 +25,13 @@ const waveforms: Array<{ value: Waveform; label: string }> = [
 const filterTypes: Array<{ value: FilterType; label: string }> = [
   { value: 'lowpass', label: 'Low-pass — warm' }, { value: 'bandpass', label: 'Band-pass — focused' }, { value: 'highpass', label: 'High-pass — thin' },
 ]
+const engineLabels: Record<InstrumentEngine, string> = {
+  subtractive: 'Signal — classic synth',
+  fm: 'Specter — FM',
+  am: 'Halo — AM',
+  membrane: 'Impact — membrane',
+  noise: 'Weather — noise',
+}
 const keyBindings = ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k']
 
 export function InstrumentPanel({ audition }: InstrumentPanelProps) {
@@ -27,12 +45,16 @@ export function InstrumentPanel({ audition }: InstrumentPanelProps) {
   const memoryFreeze = useAppStore((state) => state.memoryFreeze)
   const updateSound = useAppStore((state) => state.updateSound)
   const updateVoice = useAppStore((state) => state.updateVoice)
+  const updateVoiceLayer = useAppStore((state) => state.updateVoiceLayer)
+  const applyInstrumentPatch = useAppStore((state) => state.applyInstrumentPatch)
   const updateRoot = useAppStore((state) => state.updateRoot)
   const selectVoice = useAppStore((state) => state.selectVoice)
   const assignNote = useAppStore((state) => state.assignNote)
   const setPerformancePressure = useAppStore((state) => state.setPerformancePressure)
   const setMemoryFreeze = useAppStore((state) => state.setMemoryFreeze)
   const voice = composition.voices[selectedVoice]
+  const compatiblePatches = patchesForVoice(selectedVoice)
+  const activePatch = voice.patchId ? getInstrumentPatch(voice.patchId) : null
   const scaleNotes = notesForScale(composition.scaleRoot, composition.scaleMode)
   const rootMidi = noteToMidi(`${composition.scaleRoot}4`) ?? 60
   const keyboard = composition.scaleLock ? scaleNotes : Array.from({ length: 8 }, (_, interval) => midiToNote(rootMidi + interval))
@@ -80,11 +102,57 @@ export function InstrumentPanel({ audition }: InstrumentPanelProps) {
         <button type="button" className={voice.solo ? 'is-active' : ''} onClick={() => updateVoice(selectedVoice, 'solo', !voice.solo)}>Solo</button>
       </div>
 
-      <div className="signal-block">
-        <div className="signal-title"><Activity size={15} /><span>Core <small>Oscillator & channel</small></span></div>
-        <label className="select-control"><span className="sr-only">Core waveform</span>
-          <select value={voice.core} onChange={(event) => updateVoice(selectedVoice, 'core', event.target.value as Waveform)}>{waveforms.map((waveform) => <option key={waveform.value} value={waveform.value}>{waveform.label}</option>)}</select>
+      <div className="signal-block patch-block">
+        <div className="signal-title"><Radio size={15} /><span>Sound <small>Voice patch</small></span></div>
+        <label className="select-control patch-select"><span className="sr-only">Sound patch</span>
+          <select value={voice.patchId ?? 'custom'} onChange={(event) => event.target.value !== 'custom' && applyInstrumentPatch(selectedVoice, event.target.value)}>
+            <option value="custom">Custom voice</option>
+            {compatiblePatches.map((patch) => {
+              const pack = SOUND_PACKS.find((item) => item.id === patch.packId)
+              return <option key={patch.id} value={patch.id}>{pack?.label ?? patch.packId} · {patch.label}</option>
+            })}
+          </select>
         </label>
+        <p className="patch-description">{activePatch ? <><strong>{activePatch.label}</strong> · {activePatch.conventionalDescription}</> : 'Manual layer and channel settings.'}</p>
+      </div>
+
+      <div className="signal-block">
+        <div className="signal-title"><Activity size={15} /><span>Layers <small>Primary & shadow sources</small></span></div>
+        <div className="layer-rack">
+          {(['primary', 'shadow'] as LayerSlot[]).map((slot) => {
+            const layer = voice.layers[slot]
+            const pitched = layer.engine === 'subtractive' || layer.engine === 'fm' || layer.engine === 'am' || layer.engine === 'membrane'
+            return (
+              <div className={`layer-row${slot === 'shadow' && !layer.enabled ? ' is-disabled' : ''}`} key={slot}>
+                <div className="layer-heading">
+                  <span><strong>{slot === 'primary' ? 'Primary' : 'Shadow'}</strong><small>{slot === 'primary' ? 'Main sound layer' : 'Second sound layer'}</small></span>
+                  {slot === 'shadow' && <button type="button" className={layer.enabled ? 'is-active' : ''} onClick={() => updateVoiceLayer(selectedVoice, slot, 'enabled', !layer.enabled)}>{layer.enabled ? 'On' : 'Off'}</button>}
+                </div>
+                <label className="select-control"><span className="sr-only">{slot} engine</span>
+                  <select value={layer.engine} onChange={(event) => updateVoiceLayer(selectedVoice, slot, 'engine', event.target.value as InstrumentEngine)}>
+                    {ENGINES_BY_VOICE[selectedVoice].map((engine) => <option key={engine} value={engine}>{engineLabels[engine]}</option>)}
+                  </select>
+                </label>
+                <label className="select-control"><span className="sr-only">{slot} waveform</span>
+                  <select value={layer.waveform} onChange={(event) => updateVoiceLayer(selectedVoice, slot, 'waveform', event.target.value as Waveform)}>{waveforms.map((waveform) => <option key={waveform.value} value={waveform.value}>{waveform.label}</option>)}</select>
+                </label>
+                <div className="two-controls layer-controls">
+                  {pitched && <ControlSlider label="Altitude" conventional="Octave shift" value={layer.octave} min={-2} max={2} step={1} format={(value) => `${value > 0 ? '+' : ''}${value} oct`} onChange={(value) => updateVoiceLayer(selectedVoice, slot, 'octave', value)} />}
+                  {pitched && <ControlSlider label="Drift" conventional="Layer detune" value={layer.detune} min={-100} max={100} step={1} format={(value) => `${value} ct`} onChange={(value) => updateVoiceLayer(selectedVoice, slot, 'detune', value)} />}
+                  <ControlSlider label="Layer" conventional="Layer level" value={layer.level} min={-36} max={0} step={1} format={(value) => `${value} dB`} onChange={(value) => updateVoiceLayer(selectedVoice, slot, 'level', value)} />
+                  <ControlSlider label="Character" conventional="Engine tone" value={layer.character} min={0} max={1} step={0.01} format={(value) => `${Math.round(value * 100)}%`} onChange={(value) => updateVoiceLayer(selectedVoice, slot, 'character', value)} />
+                </div>
+                <details className="layer-advanced">
+                  <summary>Layer response</summary>
+                  <div className="two-controls">
+                    <ControlSlider label="Arrival ×" conventional="Layer attack scale" value={layer.attackScale} min={0.25} max={4} step={0.05} format={(value) => `${value.toFixed(2)}×`} onChange={(value) => updateVoiceLayer(selectedVoice, slot, 'attackScale', value)} />
+                    <ControlSlider label="Fade ×" conventional="Layer release scale" value={layer.releaseScale} min={0.25} max={4} step={0.05} format={(value) => `${value.toFixed(2)}×`} onChange={(value) => updateVoiceLayer(selectedVoice, slot, 'releaseScale', value)} />
+                  </div>
+                </details>
+              </div>
+            )
+          })}
+        </div>
         <label className="select-control voice-filter-select"><span className="sr-only">Filter character</span>
           <select value={voice.filterType} onChange={(event) => updateVoice(selectedVoice, 'filterType', event.target.value as FilterType)}>{filterTypes.map((filter) => <option key={filter.value} value={filter.value}>{filter.label}</option>)}</select>
         </label>
@@ -92,7 +160,6 @@ export function InstrumentPanel({ audition }: InstrumentPanelProps) {
           <ControlSlider label="Mask" conventional="Filter cutoff" value={voice.cutoff} min={180} max={9000} step={10} format={(value) => value >= 1000 ? `${(value / 1000).toFixed(1)}k` : `${value}`} onChange={(value) => updateVoice(selectedVoice, 'cutoff', value)} />
           <ControlSlider label="Focus" conventional="Filter resonance" value={voice.resonance} min={0} max={12} step={0.1} format={(value) => value.toFixed(1)} onChange={(value) => updateVoice(selectedVoice, 'resonance', value)} />
           <ControlSlider label="Level" conventional="Channel volume" value={voice.volume} min={-36} max={-4} step={1} format={(value) => `${value} dB`} onChange={(value) => updateVoice(selectedVoice, 'volume', value)} />
-          <ControlSlider label="Drift" conventional="Oscillator detune" value={voice.detune} min={-100} max={100} step={1} format={(value) => `${value} ct`} onChange={(value) => updateVoice(selectedVoice, 'detune', value)} />
           <ControlSlider label="Glide" conventional="Pitch portamento" value={voice.glide} min={0} max={0.5} step={0.005} format={(value) => `${Math.round(value * 1000)} ms`} onChange={(value) => updateVoice(selectedVoice, 'glide', value)} />
         </div>
       </div>

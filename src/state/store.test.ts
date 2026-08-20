@@ -119,4 +119,24 @@ describe('shared composition state', () => {
     expect(useAppStore.getState().applyPending('step').bpm).toBe(76)
     expect(useAppStore.getState().applyPending('beat').bpm).toBe(110)
   })
+
+  it('applies layered patches, marks manual edits custom, and supports undo', () => {
+    useAppStore.getState().applyInstrumentPatch('chords', 'veil-archive/glass-choir@1')
+    expect(useAppStore.getState().composition.voices.chords).toMatchObject({ patchId: 'veil-archive/glass-choir@1' })
+    expect(useAppStore.getState().composition.voices.chords.layers.shadow.enabled).toBe(true)
+    useAppStore.getState().updateVoiceLayer('chords', 'shadow', 'character', 0.61)
+    expect(useAppStore.getState().composition.voices.chords.patchId).toBeNull()
+    expect(useAppStore.getState().code).toContain('layer chords shadow: on')
+    useAppStore.getState().undo()
+    expect(useAppStore.getState().composition.voices.chords.patchId).toBe('veil-archive/glass-choir@1')
+  })
+
+  it('queues a patch at the selected musical boundary during playback', () => {
+    useAppStore.getState().setPlaying(true)
+    useAppStore.getState().applyInstrumentPatch('bass', 'veil-archive/undertow@1')
+    expect(useAppStore.getState().composition.voices.bass.patchId).toBeNull()
+    expect(useAppStore.getState().pendingComposition?.voices.bass.patchId).toBe('veil-archive/undertow@1')
+    useAppStore.getState().applyPending('bar')
+    expect(useAppStore.getState().composition.voices.bass.patchId).toBe('veil-archive/undertow@1')
+  })
 })
