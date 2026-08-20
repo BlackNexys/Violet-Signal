@@ -46,9 +46,24 @@ Validation commands:
 
 ```bash
 npm test
+npm run test:cli
 npm run lint
 npm run build
 ```
+
+### Validate and format notation from the command line
+
+The production build includes a headless `violet` executable that reuses the app's bounded parser and canonical serializer without initializing Tone.js or a browser:
+
+```bash
+npm run build:cli
+node dist-cli/violet.js validate composition.violet
+node dist-cli/violet.js validate composition.violet --json
+node dist-cli/violet.js format composition.violet --check
+node dist-cli/violet.js format composition.violet --write
+```
+
+`format` prints canonical notation by default. `--check` makes no changes and exits `1` when formatting differs; `--write` updates only the named file. Successful commands exit `0`, notation failures exit `1`, and usage, read, or write failures exit `2`. When the package is installed through a package manager, its binary name is `violet`.
 
 The reusable production-browser smoke test expects `vite preview` at `http://127.0.0.1:4173`:
 
@@ -170,4 +185,4 @@ The audio graph is created only after a user gesture. A shared source factory bu
 
 ## Next valuable milestone
 
-Complete the layered catalog with dual-oscillator, metallic, and plucked engines plus the Chrome Wound, Fractured Relay, and Low Cinema packs. After the source vocabulary is stable, expressive MIDI and pointer-drag input, interpolated automation, and per-voice stem export remain strong follow-up work.
+Promote arrangement entries from bare pattern ids to explicit occurrences with bounded transpose, voice mute, and Primary/Shadow selection. This makes each repetition musically distinct without duplicating its source pattern. The adopted sequence—including later rotation, scale modes, engine vocabulary, interpolated automation, ties, and per-voice effect sends—is maintained in [`notes/instrument-sound-and-layer-expansion-plan.md`](notes/instrument-sound-and-layer-expansion-plan.md).

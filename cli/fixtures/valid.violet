@@ -1,0 +1,4 @@
+track "CLI Fixture" {
+  notes: C4 Eb4 G4 Bb4
+  pattern: x... x.x. ..x. x...
+}

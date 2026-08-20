@@ -1,8 +1,9 @@
 # Instrument Sound and Layer Expansion Plan
 
-Status: in progress — first vertical slice completed  
+Status: in progress — CLI foundation completed; arrangement occurrence design is next
 Date: 2026-08-19  
-Last implementation update: 2026-08-19
+Last planning update: 2026-08-20
+Last implementation update: 2026-08-20
 
 ## Implementation progress
 
@@ -14,7 +15,210 @@ The first vertical slice is implemented:
 - Patch selection, editable layer controls, Custom provenance, undo/redo, and queued playback-boundary application.
 - Safe notation, CodeMirror support, IndexedDB/project normalization, documentation, and production-browser layered WAV coverage.
 
-The next slice begins with the Phase 0 profiling gate for dual, metal, and pluck sources, followed by Chrome Wound patches. Fractured Relay and Low Cinema remain later content work.
+The headless validation and formatting CLI is implemented with human-readable and JSON diagnostics, canonical check/write modes, stable exit codes, a separate Node-targeted bundle, and integration coverage. The next format change will be designed around arrangement occurrences and their transformations. The Phase 0 profiling gate for dual, metal, and pluck remains planned after the occurrence foundation; Chrome Wound, Fractured Relay, and Low Cinema remain later content work.
+
+## Post-v2 feedback roadmap
+
+Composition feedback exposed a broader opportunity than sound expansion alone: patterns currently define **what** happens and the arrangement defines **when**, but each occurrence cannot yet define **what happens differently this time**. That missing middle layer should become a signature part of Violet Signal.
+
+The adopted priorities are:
+
+| Priority | Capability | Product value | Main constraint |
+| --- | --- | --- | --- |
+| 1 | Headless validation and formatting CLI | Makes notation dependable in scripts, editors, CI, and AI-assisted workflows | Keep diagnostics stable and machine-readable |
+| 2 | Arrangement-instance transformations | Highest compositional differentiation and reuse | Requires a carefully migrated occurrence model and defined automation precedence |
+| 3 | Additional scale modes | Immediate musical range at relatively low implementation risk | Preserve unrestricted note entry |
+| 4 | Complete `dual`, `metal`, and `pluck` engines | Fulfils the sound-expansion vocabulary, especially short plucked articulation | Profile polyphony and offline parity first |
+| 5 | Interpolated automation and real ties | Adds motion and expressive glide | Requires shared automation and source-lifecycle semantics |
+| 6 | Per-voice effect sends | Makes layers occupy different depths without duplicating processors | Requires a parallel-bus graph rather than fields on the current serial chain |
+| 7 | Optional fifth melodic Signal voice | Adds a dedicated lead role | Cross-cuts voice records, notation, UI, scheduling, and rendering; defer until the preceding models settle |
+
+### Guiding decisions
+
+- Preserve the existing pattern editor: occurrence transformations add arrangement-level expression rather than duplicate pattern data.
+- Keep transformations explicit, bounded, deterministic, serializable, and identical in live and offline playback.
+- Establish one shared resolution path for playback, offline rendering, UI summaries, and future CLI inspection.
+- Do not let occurrence transforms mutate their source patterns.
+- Keep old arrangements valid by migrating each pattern id to an occurrence with neutral transforms.
+- Treat per-voice sends as a routing feature, not as separate effect instances or per-layer effect chains.
+- Keep unrestricted chromatic entry available when adding scale modes.
+
+## Milestone A — Headless CLI foundation
+
+Status: completed 2026-08-20 (`validate` and `format`); headless-browser `render` remains a later CLI milestone.
+
+The first deliverable is a small executable surface over the existing pure parser and serializer:
+
+```text
+violet validate <input.violet> [--json]
+violet format <input.violet> [--check | --write]
+violet render <input.violet> --out <output.wav>
+```
+
+Deliver `validate` and `format` first. They should not initialize Tone.js or require a browser.
+
+### CLI contract
+
+- Human-readable diagnostics are the terminal default.
+- `--json` returns a stable document such as `{ "ok": false, "diagnostics": [...] }`.
+- Each diagnostic includes a stable code, message, line when available, and a short source excerpt when useful.
+- Exit `0` means success, exit `1` means invalid composition or failed format check, and exit `2` means invalid CLI usage or an unexpected runtime failure.
+- `format --check` never writes and is appropriate for CI.
+- `format --write` uses canonical serialization and changes only the explicitly named file.
+- Standard input/output support may follow after the file contract is stable.
+
+`render` is part of the same public command family but is a second CLI milestone. The current offline renderer relies on Web Audio and the Node test environment does not provide a native `OfflineAudioContext`. The first headless renderer should therefore drive the existing production-browser renderer through headless Chromium, preserving the already-tested audio path. A native Node audio backend should only be considered later if its maintenance and parity cost is justified.
+
+Exit criteria:
+
+- Valid and invalid fixtures produce deterministic output and exit codes.
+- Canonical files pass `format --check`; non-canonical files fail without modification.
+- JSON diagnostics are covered as a compatibility surface.
+- CLI behavior works outside the repository checkout after packaging.
+
+## Milestone B — Arrangement occurrence foundation
+
+Replace `PatternId[]` as the persisted arrangement concept with explicit occurrences. Exact TypeScript names may change, but the model should resemble:
+
+```ts
+interface ArrangementOccurrence {
+  pattern: PatternId
+  transpose: number
+  rotate: number
+  mute: VoiceId[]
+  layers: Partial<Record<VoiceId, 'all' | 'primary' | 'shadow'>>
+  effects: Partial<OccurrenceEffectModifiers>
+}
+```
+
+Every field must have a neutral value so legacy entries migrate without audible change:
+
+- `transpose: 0`
+- `rotate: 0`
+- `mute: []`
+- missing layer selections mean `all`
+- missing effect modifiers mean no change
+
+### Resolution semantics
+
+Use this precedence everywhere:
+
+```text
+pattern data and automation
+    -> arrangement-occurrence transformation
+    -> live performance gesture
+    -> bounded audio safety mapping
+```
+
+Initial implementation scope:
+
+1. Transpose pitch-bearing Chord and Bass events by bounded semitones.
+2. Mute any voice for one occurrence without changing its pattern or global voice state.
+3. Select all, Primary-only, or Shadow-only output for a voice in one occurrence.
+4. Add rotation after its precise semantics are tested.
+5. Add effect modifiers only after their interaction with automation is represented by the shared resolver.
+
+Rotation should rotate the whole pattern memory, including its automation lanes. Splitting event rotation from automation rotation can be a later explicit feature; it must not happen accidentally. A rotated occurrence resolves virtual step indices and never rewrites the source pattern.
+
+Effect transformations should be bounded modifiers rather than hidden replacement values. The resolver must document whether each modifier is an offset or multiplier and clamp only at the final safety-mapping stage. This preserves the audible contribution of pattern automation.
+
+### Notation checkpoint
+
+Arrangement occurrences likely require format v3. Before implementation, compare a compact inline form such as:
+
+```text
+arrangement: A A[transpose=12] B[mute=pulse] C[rotate=2]
+```
+
+against an explicitly named occurrence form. Select the grammar using these criteria:
+
+- readable diffs;
+- friendly line-specific errors;
+- unambiguous whitespace and list parsing;
+- canonical formatting;
+- room for layer selection and effect modifiers without making one line opaque.
+
+Do not commit the file grammar merely because it mirrors the first TypeScript shape. Prototype parser errors and representative compositions first.
+
+Exit criteria:
+
+- Legacy arrangements migrate idempotently and sound unchanged.
+- Occurrences round-trip through notation, persistence, undo/redo, and project normalization.
+- Sequencer summaries make transformed occurrences distinguishable without overcrowding the arrangement strip.
+- Live and offline event plans resolve the same notes, steps, layers, mutes, and modifiers.
+
+## Milestone C — First expressive transformations
+
+Ship the occurrence model through a musically complete vertical slice:
+
+- transpose;
+- per-occurrence voice mute;
+- per-occurrence Primary/Shadow selection;
+- arrangement editing UI and readable summaries;
+- notation and migration;
+- live and offline parity;
+- deterministic tests covering loops, Ghost, Chance, ratchets, and Overclock.
+
+Add rotation and effect modifiers immediately afterward, once the shared resolution semantics are proven. This sequencing keeps the format extensible without making the first occurrence implementation depend on effect-graph work.
+
+## Milestone D — Scale and engine vocabulary
+
+Add Dorian, Phrygian, harmonic minor, melodic minor, and pentatonic modes while retaining major, minor, and unrestricted entry. Scale helpers, parser validation, UI choices, style recipes, transposition, and tests must use the same interval definitions.
+
+Resume the sound-engine profiling gate for:
+
+- `dual` for wide detuned Chord and Bass patches;
+- `metal` for Pulse and Texture transients;
+- `pluck`, with managed polyphony and lifecycle tests, as the most compositionally important addition.
+
+This milestone completes Chrome Wound before expanding Fractured Relay and Low Cinema.
+
+## Milestone E — Automation interpolation and ties
+
+Automation should progress from the current held-value lanes to explicit interpolation modes:
+
+- **Hold** preserves current behavior and migration compatibility.
+- **Linear** interpolates between authored points.
+- **Ease** remains optional until Hold and Linear are audible, deterministic, and understandable in the editor.
+
+Implement one pure automation resolver used by the live engine, offline renderer, UI previews, and occurrence-effect resolution.
+
+Real ties and legato require source adapters to expose attack, pitch change, and release lifecycles rather than relying only on `triggerAttackRelease`. Tie semantics must cover loop boundaries, ratchets, rests, Ghost/Chance decisions, panic, engine replacement, and Glide. Do not encode ties as unusually long gate values.
+
+## Milestone F — Per-voice effect sends
+
+The current graph routes all voices through one serial chain. True sends therefore require a topology refactor:
+
+```text
+voice channels -> dry bus ---------------------------------> output
+              -> Fracture send -> shared Fracture return --|
+              -> Veil send ----> shared Veil return -------|
+              -> Memory send --> shared Memory return -----|
+              -> Environment --> shared Environment return-|
+```
+
+Global effect controls continue to shape the shared processors; per-voice send values control how much Chord, Bass, Pulse, and Texture enter each processor. Start with migrated defaults chosen through listening comparisons. A parallel topology will not automatically reproduce the current serial interactions, so sonic compatibility needs explicit fixtures and, if necessary, a documented compatibility strategy.
+
+Build the routing description once and instantiate it for both live and offline contexts. Validate gain staging, feedback safety, mute/solo, bypass, automation, tail duration, disposal, and deterministic WAV output before exposing all send controls in the UI.
+
+## Deferred expansion — Optional Signal voice
+
+A fifth melodic `signal` voice remains a valid future direction for leads and counter-lines, but it is deliberately deferred. The current four-role union is embedded in records, styles, notation, instrument UI, engine construction, offline rendering, and tests. Adding Signal after occurrence transforms and routing settle avoids multiplying both migrations at once.
+
+Its design checkpoint must decide whether Signal receives its own pattern lane, shares a pitched pattern representation, and participates in every existing style by default or only when authored.
+
+## Revised delivery sequence
+
+1. **Completed:** Package `violet validate` and `violet format` with stable diagnostics.
+2. Specify format-v3 arrangement occurrences and build the shared occurrence resolver.
+3. Ship transpose, occurrence mute, and Primary/Shadow selection end to end.
+4. Add headless-browser `violet render` and verify WAV parity.
+5. Add scale modes and complete dual, metal, and pluck profiling and patches.
+6. Add occurrence rotation and bounded effect modifiers.
+7. Add Hold/Linear automation interpolation.
+8. Add true ties and legato source lifecycles.
+9. Refactor the effect graph and expose per-voice sends.
+10. Reassess the optional Signal voice using real composition feedback from the preceding features.
 
 ## Outcome
 
