@@ -4,7 +4,8 @@ export const STEP_COUNT = DEFAULT_STEP_COUNT
 export const STEP_COUNT_OPTIONS = [8, 12, 14, 16, 20, 24, 28, 32, 64] as const
 export const METERS = ['4/4', '3/4', '6/8', '5/4', '7/8'] as const
 export const PATTERN_IDS = ['A', 'B', 'C', 'D'] as const
-export const FORMAT_VERSION = 2
+export const VOICE_IDS = ['chords', 'bass', 'pulse', 'texture'] as const
+export const FORMAT_VERSION = 3
 
 export type PatternId = (typeof PATTERN_IDS)[number]
 export type Waveform = 'sine' | 'triangle' | 'square' | 'sawtooth'
@@ -14,8 +15,9 @@ export type StyleId = string
 /** @deprecated `world` remains the serialized compatibility name for a style id. */
 export type SoundWorld = StyleId
 export type Meter = (typeof METERS)[number]
-export type VoiceId = 'chords' | 'bass' | 'pulse' | 'texture'
+export type VoiceId = (typeof VOICE_IDS)[number]
 export type LayerSlot = 'primary' | 'shadow'
+export type ArrangementLayerSelection = 'all' | LayerSlot
 export type InstrumentEngine = 'subtractive' | 'fm' | 'am' | 'membrane' | 'noise'
 export type NoteLane = 'notes' | 'bass'
 export type StepLane = NoteLane | 'drum' | 'texture'
@@ -82,6 +84,13 @@ export interface Pattern {
   automation: AutomationLanes
 }
 
+export interface ArrangementOccurrence {
+  pattern: PatternId
+  transpose: number
+  mute: VoiceId[]
+  layers: Partial<Record<VoiceId, ArrangementLayerSelection>>
+}
+
 export interface Composition {
   formatVersion: number
   id: string
@@ -102,7 +111,7 @@ export interface Composition {
   voices: Record<VoiceId, VoiceSettings>
   patterns: Pattern[]
   activePatternId: PatternId
-  arrangement: PatternId[]
+  arrangement: ArrangementOccurrence[]
 }
 
 export const clamp = (value: number, minimum: number, maximum: number) =>
@@ -238,6 +247,30 @@ export const makeEmptyPattern = (id: PatternId, stepCount = DEFAULT_STEP_COUNT):
   automation: makeAutomationLanes(stepCount),
 })
 
+export function makeArrangementOccurrence(pattern: PatternId): ArrangementOccurrence {
+  return { pattern, transpose: 0, mute: [], layers: {} }
+}
+
+export function normalizeArrangementOccurrence(
+  input: PatternId | Partial<ArrangementOccurrence> | undefined,
+  fallback: PatternId = 'A',
+): ArrangementOccurrence {
+  if (typeof input === 'string') {
+    return makeArrangementOccurrence(PATTERN_IDS.includes(input) ? input : fallback)
+  }
+  const pattern = input?.pattern && PATTERN_IDS.includes(input.pattern) ? input.pattern : fallback
+  const rawTranspose = input?.transpose
+  const transpose = Math.round(clamp(typeof rawTranspose === 'number' && Number.isFinite(rawTranspose) ? rawTranspose : 0, -24, 24))
+  const inputMute = Array.isArray(input?.mute) ? input.mute : []
+  const mute = VOICE_IDS.filter((voice) => inputMute.includes(voice))
+  const layers: ArrangementOccurrence['layers'] = {}
+  for (const voice of VOICE_IDS) {
+    const selection = input?.layers?.[voice]
+    if (selection === 'primary' || selection === 'shadow') layers[voice] = selection
+  }
+  return { pattern, transpose, mute, layers }
+}
+
 export const makeEmptyComposition = (): Composition => ({
   formatVersion: FORMAT_VERSION,
   id: 'untitled-signal',
@@ -263,7 +296,7 @@ export const makeEmptyComposition = (): Composition => ({
   },
   patterns: PATTERN_IDS.map((id) => makeEmptyPattern(id, DEFAULT_STEP_COUNT)),
   activePatternId: 'A',
-  arrangement: ['A', 'A', 'B', 'C'],
+  arrangement: (['A', 'A', 'B', 'C'] as PatternId[]).map(makeArrangementOccurrence),
 })
 
 const NOTE_PATTERN = /^([A-G])([#b]?)(-?\d)$/
@@ -361,6 +394,8 @@ export function clonePattern(pattern: Pattern): Pattern {
 
 export function cloneComposition(composition: Composition): Composition {
   const stepCount = normalizeStepCount(composition.stepCount ?? composition.patterns?.[0]?.steps.length ?? DEFAULT_STEP_COUNT)
+  const legacyArrangement = (composition.arrangement ?? []) as unknown as Array<PatternId | Partial<ArrangementOccurrence>>
+  const arrangement = legacyArrangement.slice(0, 16).map((occurrence) => normalizeArrangementOccurrence(occurrence, composition.activePatternId ?? 'A'))
   return {
     ...composition,
     formatVersion: FORMAT_VERSION,
@@ -378,7 +413,7 @@ export function cloneComposition(composition: Composition): Composition {
       texture: normalizeVoice('texture', composition.voices?.texture),
     },
     patterns: composition.patterns.map((pattern) => resizePattern(clonePattern(pattern), stepCount)),
-    arrangement: [...composition.arrangement],
+    arrangement: arrangement.length ? arrangement : [makeArrangementOccurrence(composition.activePatternId ?? 'A')],
   }
 }
 

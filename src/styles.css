@@ -325,9 +325,24 @@ button:disabled { cursor: not-allowed; opacity: 0.35; }
 .arrangement-cells, .arrangement-add { display: flex; gap: 3px; }
 .arrangement-cells button, .arrangement-add button, .arrangement-clear { height: 28px; min-width: 28px; padding: 0 5px; border: 1px solid #393044; border-radius: 2px; background: #15111d; color: #a093a6; font: 10px var(--font-data); }
 .arrangement-cells button.is-playing { color: var(--signal-soft); border-color: var(--signal); background: #2a1839; box-shadow: inset 0 -2px var(--violet), var(--glow-signal); }
+.arrangement-cells button.is-selected { outline: 1px solid var(--data-cool); outline-offset: 1px; color: var(--text); }
 .arrangement-add { padding-left: 5px; border-left: 1px solid #2b252f; }
 .arrangement-add button { color: #665e6a; background: transparent; }
 .arrangement-clear { margin-left: auto; color: #665e6a; }
+.occurrence-editor { display: grid; gap: 8px; margin: -5px 0 14px; padding: 10px; border: 1px solid #342a3e; border-radius: 3px; background: linear-gradient(135deg, rgba(37,22,49,.72), rgba(11,9,15,.9)); }
+.occurrence-editor__heading, .occurrence-editor__row, .occurrence-editor__layers { display: flex; align-items: center; gap: 10px; }
+.occurrence-editor__heading { justify-content: space-between; }
+.occurrence-editor__heading > div { display: grid; gap: 2px; }
+.occurrence-editor__heading strong { color: var(--signal-soft); font: 11px var(--font-data); text-transform: uppercase; letter-spacing: .08em; }
+.occurrence-editor__heading button, .occurrence-editor__buttons button { min-height: 27px; border: 1px solid #41354b; border-radius: 2px; background: #17111e; color: var(--muted); font: 9px var(--font-data); }
+.occurrence-editor__heading button { display: inline-flex; align-items: center; gap: 5px; }
+.occurrence-editor__row > span, .occurrence-editor__layers > span { width: 105px; flex: 0 0 105px; color: var(--muted); font: 9px var(--font-data); text-transform: uppercase; letter-spacing: .08em; }
+.occurrence-editor__row output { color: var(--signal-soft); }
+.occurrence-editor__buttons { display: flex; flex-wrap: wrap; gap: 4px; }
+.occurrence-editor__buttons button.is-active { color: var(--signal-soft); border-color: var(--signal); background: #2a1839; }
+.occurrence-editor__layers { align-items: end; flex-wrap: wrap; }
+.occurrence-editor__layers label { display: grid; gap: 3px; color: var(--muted); font: 8px var(--font-data); text-transform: uppercase; letter-spacing: .06em; }
+.occurrence-editor__layers select { min-height: 28px; max-width: 125px; border: 1px solid #41354b; background: #100c15; color: var(--text); font: 9px var(--font-data); }
 .sequencer-scroll { overflow-x: auto; scrollbar-color: #5c4770 transparent; scrollbar-width: thin; padding: 5px 5px 15px; border: 1px solid rgba(40,33,50,.7); border-radius: 3px; background: linear-gradient(180deg, #09080d, #0d0b12); box-shadow: inset 0 1px rgba(255,255,255,.018); }
 .sequencer-grid { min-width: var(--grid-min-width, 686px); display: grid; grid-template-columns: 78px repeat(var(--step-count, 16), minmax(34px, 1fr)); gap: 4px; align-items: center; }
 .beat-ruler { min-width: 686px; display: grid; grid-template-columns: 78px repeat(4, 1fr); gap: 4px; padding-bottom: 4px; }
@@ -579,6 +594,11 @@ kbd { display: inline-block; min-width: 17px; padding: 1px 4px; border: 1px soli
   .pattern-toolbar { align-items: flex-start; flex-direction: column; }
   .pattern-actions { width: 100%; }
   .pattern-actions button { flex: 1; }
+  .occurrence-editor__row, .occurrence-editor__layers { align-items: stretch; flex-direction: column; gap: 5px; }
+  .occurrence-editor__row > span, .occurrence-editor__layers > span { width: auto; flex-basis: auto; }
+  .occurrence-editor__layers label { grid-template-columns: 70px minmax(0, 1fr); align-items: center; }
+  .occurrence-editor__layers select { max-width: none; width: 100%; min-height: 40px; }
+  .occurrence-editor__buttons button { min-height: 40px; }
   .note-assignment { grid-template-columns: 1fr; }
   .chord-suggestions { overflow-x: auto; }
   .learning-backdrop { padding: 10px; }

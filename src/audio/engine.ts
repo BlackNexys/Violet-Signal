@@ -1,5 +1,6 @@
 import * as Tone from 'tone'
-import { clamp, getPattern, meterParts, stepsPerBeat, type ApplyQuantization, type Composition, type PatternId, type VoiceId } from '../model/composition'
+import { clamp, meterParts, stepsPerBeat, type ApplyQuantization, type Composition, type PatternId, type VoiceId } from '../model/composition'
+import { occurrenceAllowsVoice, occurrenceLayerSelection, resolveArrangementOccurrence, transposeOccurrenceNote, transposeOccurrenceNotes } from '../model/arrangement'
 import { mapOverclock } from './overclock'
 import { advanceFatigue, resolveSequencerStep } from './sequencing'
 import { delayFeedback, delayWet, INPUT_GAIN, LIMITER_CEILING_DB, masterOutputDb, reverbWet } from './signalPath'
@@ -140,8 +141,8 @@ export class VioletAudioEngine {
     const boundary: Boundary = this.step === 0 ? 'bar' : this.step % beatSize === 0 ? 'beat' : 'step'
     const composition = this.callbacks.applyBoundary(boundary)
     const arrangementIndex = this.barIndex % Math.max(1, composition.arrangement.length)
-    const patternId = composition.arrangement[arrangementIndex] ?? composition.activePatternId
-    const pattern = getPattern(composition, patternId)
+    const { occurrence, pattern } = resolveArrangementOccurrence(composition, arrangementIndex)
+    const patternId = occurrence.pattern
     if (this.step >= pattern.steps.length) this.step = 0
     const current = pattern.steps[this.step]
     const performance = this.callbacks.getPerformance()
@@ -160,23 +161,25 @@ export class VioletAudioEngine {
     const ratchetSpacing = stepDuration / resolved.ratchets
     const triggerTimes = Array.from({ length: resolved.ratchets }, (_, index) => jitteredTime + index * ratchetSpacing)
 
-    if (current.notes.length && resolved.shouldPlay) this.lastChord = [...current.notes]
-    if (resolved.shouldPlay && (current.notes.length || resolved.isGhostChord)) {
-      const chord = current.notes.length ? current.notes : this.lastChord
+    const chordAllowed = occurrenceAllowsVoice(composition, occurrence, 'chords')
+    if (current.notes.length && resolved.shouldPlay && chordAllowed) this.lastChord = [...current.notes]
+    if (resolved.shouldPlay && chordAllowed && (current.notes.length || resolved.isGhostChord)) {
+      const chord = transposeOccurrenceNotes(current.notes.length ? current.notes : this.lastChord, occurrence)
       const intendedDuration = resolved.isGhostChord ? stepDuration * 0.45 : stepDuration * current.chordLength * 0.94
       const duration = resolved.ratchets > 1 ? Math.min(intendedDuration, ratchetSpacing * 0.82) : intendedDuration
-      for (const triggerTime of triggerTimes) this.sources.chords?.trigger(chord, duration, triggerTime, clamp(current.velocity * (resolved.isGhostChord ? 0.3 : 0.72), 0.08, 0.78))
+      for (const triggerTime of triggerTimes) this.sources.chords?.trigger(chord, duration, triggerTime, clamp(current.velocity * (resolved.isGhostChord ? 0.3 : 0.72), 0.08, 0.78), occurrenceLayerSelection(occurrence, 'chords'))
     }
-    if (resolved.shouldPlay && current.bass) {
+    if (resolved.shouldPlay && current.bass && occurrenceAllowsVoice(composition, occurrence, 'bass')) {
       const intendedDuration = stepDuration * current.bassLength * 0.92
       const duration = resolved.ratchets > 1 ? Math.min(intendedDuration, ratchetSpacing * 0.82) : intendedDuration
-      for (const triggerTime of triggerTimes) this.sources.bass?.trigger(current.bass, duration, triggerTime, clamp(current.velocity * 0.72, 0.12, 0.72))
+      const bass = transposeOccurrenceNote(current.bass, occurrence)
+      for (const triggerTime of triggerTimes) this.sources.bass?.trigger(bass, duration, triggerTime, clamp(current.velocity * 0.72, 0.12, 0.72), occurrenceLayerSelection(occurrence, 'bass'))
     }
-    if (resolved.shouldPlay && (current.drum || resolved.isGhostDrum)) {
-      for (const triggerTime of triggerTimes) this.sources.pulse?.trigger(resolved.isGhostDrum ? 'C1' : this.step % beatSize === 0 ? 'C1' : 'G1', Math.min(stepDuration * 0.5, ratchetSpacing * 0.72), triggerTime, clamp(current.velocity * (resolved.isGhostDrum ? 0.26 : 0.62), 0.08, 0.64))
+    if (resolved.shouldPlay && occurrenceAllowsVoice(composition, occurrence, 'pulse') && (current.drum || resolved.isGhostDrum)) {
+      for (const triggerTime of triggerTimes) this.sources.pulse?.trigger(resolved.isGhostDrum ? 'C1' : this.step % beatSize === 0 ? 'C1' : 'G1', Math.min(stepDuration * 0.5, ratchetSpacing * 0.72), triggerTime, clamp(current.velocity * (resolved.isGhostDrum ? 0.26 : 0.62), 0.08, 0.64), occurrenceLayerSelection(occurrence, 'pulse'))
     }
-    if (resolved.shouldPlay && current.texture) {
-      for (const triggerTime of triggerTimes) this.sources.texture?.trigger(null, Math.min(stepDuration * 1.7, ratchetSpacing * 0.82), triggerTime, clamp(current.velocity * 0.28, 0.05, 0.28))
+    if (resolved.shouldPlay && current.texture && occurrenceAllowsVoice(composition, occurrence, 'texture')) {
+      for (const triggerTime of triggerTimes) this.sources.texture?.trigger(null, Math.min(stepDuration * 1.7, ratchetSpacing * 0.82), triggerTime, clamp(current.velocity * 0.28, 0.05, 0.28), occurrenceLayerSelection(occurrence, 'texture'))
     }
 
     this.updateFatigue(resolved.overclock, time)

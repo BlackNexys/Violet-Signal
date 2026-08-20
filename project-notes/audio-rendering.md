@@ -1,6 +1,8 @@
 # Live and offline audio parity
 
-Violet Signal uses one shared set of pure mappings to resolve step automation, seeded Ghost and Chance events, deterministic Humanize/Swing/Micro Shift offsets, ratchets, fatigue, effect gain staging, texture noise color, and layered-instrument Character. The live engine schedules the resolved events against Tone Transport; the WAV renderer schedules the same written events inside a Tone Offline context.
+Violet Signal uses one shared set of pure mappings to resolve arrangement occurrences, step automation, seeded Ghost and Chance events, deterministic Humanize/Swing/Micro Shift offsets, ratchets, fatigue, effect gain staging, texture noise color, and layered-instrument Character. The live engine schedules the resolved events against Tone Transport; the WAV renderer schedules the same written events inside a Tone Offline context.
+
+Arrangement occurrence resolution selects the source pattern without mutating it, then applies bounded pitch transposition, per-occurrence voice mute, and per-voice layer focus to scheduled events. Neutral occurrences reproduce the legacy pattern-letter behavior. Both renderers use the same occurrence helpers and the precedence `pattern data/automation -> occurrence transform -> performance gesture -> safety mapping`.
 
 The offline synthesis graph mirrors the live graph: each voice's Primary and optional Shadow sources are created through the same source factory, then four filtered voice channels feed the same input trim, drive, Fracture, Veil, Memory, Environment, master trim, and `−1 dB` limiter. Engine Character, layer pitch/level/response, bass filter-envelope behavior, pulse pitch decay, chord Overclock shaping, and Texture noise color are also matched.
 

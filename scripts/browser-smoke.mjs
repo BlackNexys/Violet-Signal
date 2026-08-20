@@ -71,6 +71,14 @@ try {
   await secondTouchKey.click()
   expect((await stepTwoChord.getAttribute('aria-label'))?.includes(assignedPitch), 'touch key did not assign the displayed pitch to the selected step')
 
+  await page.locator('.arrangement-cells button').nth(1).click()
+  const occurrenceEditor = page.locator('.occurrence-editor')
+  await occurrenceEditor.getByRole('button', { name: '+12', exact: true }).click()
+  await occurrenceEditor.getByRole('button', { name: 'Pulse', exact: true }).click()
+  await occurrenceEditor.locator('select').first().selectOption('shadow')
+  await page.waitForFunction(() => document.querySelector('.cm-content')?.textContent?.includes('A[transpose=12,mute=pulse,layers=chords:shadow]'))
+  expect((await page.locator('.arrangement-cells button').nth(1).getAttribute('title'))?.includes('transpose +12'), 'occurrence summary did not reflect its transformations')
+
   const tempoLine = page.locator('.cm-line').filter({ hasText: 'tempo:' }).first()
   await tempoLine.click()
   await page.keyboard.press('Home')
@@ -170,7 +178,7 @@ try {
   await page.screenshot({ path: 'artifacts/violet-signal-narrow.png', fullPage: true })
 
   if (failures.length) throw new Error(failures.join('\n'))
-  console.log('Browser smoke passed: styles, learning, layered patches, synchronization, parser protection, audio effects, capture, WAV, and responsive tabs.')
+  console.log('Browser smoke passed: styles, learning, arrangement occurrences, layered patches, synchronization, parser protection, audio effects, capture, WAV, and responsive tabs.')
 } finally {
   await browser.close()
 }

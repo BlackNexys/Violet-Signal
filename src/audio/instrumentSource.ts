@@ -2,6 +2,7 @@ import * as Tone from 'tone'
 import {
   clamp,
   transposeNote,
+  type ArrangementLayerSelection,
   type InstrumentEngine,
   type LayerSlot,
   type VoiceId,
@@ -170,6 +171,7 @@ export class LayeredVoiceSource {
   }
 
   update(settings: VoiceSettings, modifiers: VoiceRuntimeModifiers = NEUTRAL_VOICE_MODIFIERS): void {
+    const shadowWasEnabled = this.settings.layers.shadow.enabled
     this.settings = settings
     for (const slot of ['primary', 'shadow'] as LayerSlot[]) {
       const layer = settings.layers[slot]
@@ -180,15 +182,16 @@ export class LayeredVoiceSource {
         this.sources[slot] = makeLayerSource(this.role, layer, this.gains[slot])
       }
       this.gains[slot].volume.rampTo(layer.level, 0.05)
-      this.gains[slot].mute = slot === 'shadow' && !layer.enabled
       this.sources[slot]?.update(layer, settings, modifiers)
     }
+    if (shadowWasEnabled && !settings.layers.shadow.enabled) this.sources.shadow?.release()
   }
 
-  trigger(notes: string | string[] | null, duration: number, time: number, velocity: number): void {
+  trigger(notes: string | string[] | null, duration: number, time: number, velocity: number, selection: ArrangementLayerSelection = 'all'): void {
     for (const slot of ['primary', 'shadow'] as LayerSlot[]) {
       const layer = this.settings.layers[slot]
-      if (slot === 'shadow' && !layer.enabled) continue
+      const selected = selection === 'all' ? slot === 'primary' || layer.enabled : slot === selection
+      if (!selected) continue
       this.sources[slot]?.trigger(shiftedNotes(notes, layer.octave), duration, time, velocity)
     }
   }

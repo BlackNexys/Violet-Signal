@@ -1,5 +1,7 @@
 import {
   PATTERN_IDS,
+  VOICE_IDS,
+  type ArrangementOccurrence,
   type AutomationTarget,
   type Composition,
   type Pattern,
@@ -53,6 +55,15 @@ function shadowLine(composition: Composition, id: VoiceId): string {
   return `  layer ${id} shadow: ${layer.enabled ? 'on' : 'off'} engine=${layer.engine} waveform=${layer.waveform} octave=${layer.octave} detune=${amount(layer.detune)} level=${amount(layer.level)} character=${amount(layer.character)} attack-scale=${amount(layer.attackScale)} release-scale=${amount(layer.releaseScale)}`
 }
 
+function arrangementOccurrence(occurrence: ArrangementOccurrence): string {
+  const options: string[] = []
+  if (occurrence.transpose) options.push(`transpose=${occurrence.transpose}`)
+  if (occurrence.mute.length) options.push(`mute=${VOICE_IDS.filter((voice) => occurrence.mute.includes(voice)).join('+')}`)
+  const layers = VOICE_IDS.flatMap((voice) => occurrence.layers[voice] ? [`${voice}:${occurrence.layers[voice]}`] : [])
+  if (layers.length) options.push(`layers=${layers.join('+')}`)
+  return `${occurrence.pattern}${options.length ? `[${options.join(',')}]` : ''}`
+}
+
 export function serializeComposition(composition: Composition): string {
   const lines = [
     `scene "${composition.name.replace(/"/g, '')}" {`,
@@ -69,7 +80,7 @@ export function serializeComposition(composition: Composition): string {
     `  lock: ${composition.scaleLock ? 'on' : 'off'}`,
     `  patterns: ${PATTERN_IDS.join(' ')}`,
     `  active: ${composition.activePatternId}`,
-    `  arrangement: ${composition.arrangement.join(' ')}`,
+    `  arrangement: ${composition.arrangement.map(arrangementOccurrence).join(' ')}`,
     `  patch chords: ${composition.voices.chords.patchId ?? 'custom'}`,
     voiceLine(composition, 'chords'),
     shadowLine(composition, 'chords'),
@@ -141,7 +152,7 @@ export function summarizeCompositionChange(current: Composition, pending: Compos
   if (current.bpm !== pending.bpm) changes.push(`tempo ${current.bpm} → ${pending.bpm}`)
   if (current.world !== pending.world) changes.push(`style ${current.world} → ${pending.world}`)
   if (current.meter !== pending.meter || current.stepCount !== pending.stepCount || current.swing !== pending.swing) changes.push('timing & groove')
-  if (current.arrangement.join() !== pending.arrangement.join()) changes.push('arrangement')
+  if (JSON.stringify(current.arrangement) !== JSON.stringify(pending.arrangement)) changes.push('arrangement')
   if (JSON.stringify(current.voices) !== JSON.stringify(pending.voices)) changes.push('voice settings')
   if (JSON.stringify(current.patterns) !== JSON.stringify(pending.patterns)) changes.push('pattern notes')
   if (JSON.stringify(current.sound) !== JSON.stringify(pending.sound)) changes.push('effects')

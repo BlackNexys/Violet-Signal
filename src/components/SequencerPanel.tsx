@@ -12,13 +12,16 @@ import {
 } from 'lucide-react'
 import {
   PATTERN_IDS,
+  VOICE_IDS,
   chordSuggestions,
   getActivePattern,
   stepsPerBeat,
   type AutomationTarget,
+  type ArrangementLayerSelection,
   type NoteLane,
   type StepLane,
 } from '../model/composition'
+import { arrangementOccurrenceDescription, arrangementOccurrenceLabel } from '../model/arrangement'
 import { useAppStore } from '../state/store'
 
 const shortNotes = (notes: string[]) => notes.length ? `${notes[0].replace(/-?\d/, '')}${notes.length > 1 ? `+${notes.length - 1}` : ''}` : '·'
@@ -33,6 +36,7 @@ const automationBounds: Record<AutomationTarget, { min: number; max: number; ste
 
 export function SequencerPanel() {
   const [automationTarget, setAutomationTarget] = useState<AutomationTarget>('mask')
+  const [selectedOccurrenceIndex, setSelectedOccurrenceIndex] = useState(0)
   const composition = useAppStore((state) => state.composition)
   const activeStep = useAppStore((state) => state.activeStep)
   const playingPatternId = useAppStore((state) => state.playingPatternId)
@@ -52,6 +56,9 @@ export function SequencerPanel() {
   const addArrangementPattern = useAppStore((state) => state.addArrangementPattern)
   const removeArrangementPattern = useAppStore((state) => state.removeArrangementPattern)
   const clearArrangement = useAppStore((state) => state.clearArrangement)
+  const setArrangementTranspose = useAppStore((state) => state.setArrangementTranspose)
+  const toggleArrangementMute = useAppStore((state) => state.toggleArrangementMute)
+  const setArrangementLayer = useAppStore((state) => state.setArrangementLayer)
   const setAutomationPoint = useAppStore((state) => state.setAutomationPoint)
   const setStepExpression = useAppStore((state) => state.setStepExpression)
   const pattern = getActivePattern(composition)
@@ -68,6 +75,8 @@ export function SequencerPanel() {
   const automation = pattern.automation[automationTarget]
   const automationConfig = automationBounds[automationTarget]
   const fallbackAutomation = automationTarget === 'mask' ? composition.voices.chords.cutoff : composition.sound[automationTarget]
+  const occurrenceIndex = Math.min(selectedOccurrenceIndex, composition.arrangement.length - 1)
+  const occurrence = composition.arrangement[occurrenceIndex]
 
   const selectLane = (step: number, lane: StepLane) => selectStep(step, lane)
   const toggleAndSelect = (step: number, lane: 'drum' | 'texture') => {
@@ -102,15 +111,49 @@ export function SequencerPanel() {
       <div className="arrangement-strip">
         <span>Song</span>
         <div className="arrangement-cells">
-          {composition.arrangement.map((id, index) => (
-            <button type="button" key={`${id}-${index}`} className={index === arrangementIndex ? 'is-playing' : ''} title="Remove this bar" onClick={() => removeArrangementPattern(index)}>{id}</button>
+          {composition.arrangement.map((item, index) => (
+            <button type="button" key={`${item.pattern}-${index}`} className={`${index === arrangementIndex ? 'is-playing ' : ''}${index === occurrenceIndex ? 'is-selected' : ''}`} aria-pressed={index === occurrenceIndex} title={arrangementOccurrenceDescription(item, index)} onClick={() => { setSelectedOccurrenceIndex(index); selectPattern(item.pattern) }}>{arrangementOccurrenceLabel(item)}</button>
           ))}
         </div>
         <div className="arrangement-add" aria-label="Append pattern to arrangement">
-          {PATTERN_IDS.map((id) => <button type="button" key={id} disabled={composition.arrangement.length >= 16} onClick={() => addArrangementPattern(id)}>+{id}</button>)}
+          {PATTERN_IDS.map((id) => <button type="button" key={id} disabled={composition.arrangement.length >= 16} onClick={() => { setSelectedOccurrenceIndex(composition.arrangement.length); addArrangementPattern(id) }}>+{id}</button>)}
         </div>
-        <button type="button" className="arrangement-clear" title="Start arrangement with the active pattern" onClick={clearArrangement}><RotateCcw size={12} /></button>
+        <button type="button" className="arrangement-clear" title="Start arrangement with the active pattern" onClick={() => { setSelectedOccurrenceIndex(0); clearArrangement() }}><RotateCcw size={12} /></button>
       </div>
+
+      {occurrence && (
+        <div className="occurrence-editor" aria-label={`Arrangement occurrence ${occurrenceIndex + 1} transformations`}>
+          <div className="occurrence-editor__heading">
+            <div><span className="eyebrow">Occurrence {occurrenceIndex + 1}</span><strong>Pattern {occurrence.pattern}</strong></div>
+            <button type="button" disabled={composition.arrangement.length <= 1} title="Remove selected occurrence" onClick={() => removeArrangementPattern(occurrenceIndex)}><Trash2 size={12} /> Remove</button>
+          </div>
+          <div className="occurrence-editor__row">
+            <span>Transpose <output>{occurrence.transpose > 0 ? '+' : ''}{occurrence.transpose}</output></span>
+            <div className="occurrence-editor__buttons">
+              {[-12, -1, 1, 12].map((amount) => <button type="button" key={amount} disabled={occurrence.transpose + amount < -24 || occurrence.transpose + amount > 24} onClick={() => setArrangementTranspose(occurrenceIndex, occurrence.transpose + amount)}>{amount > 0 ? '+' : ''}{amount}</button>)}
+              <button type="button" disabled={occurrence.transpose === 0} onClick={() => setArrangementTranspose(occurrenceIndex, 0)}>Reset</button>
+            </div>
+          </div>
+          <div className="occurrence-editor__row">
+            <span>Mute this time</span>
+            <div className="occurrence-editor__buttons">
+              {VOICE_IDS.map((voice) => <button type="button" key={voice} className={occurrence.mute.includes(voice) ? 'is-active' : ''} aria-pressed={occurrence.mute.includes(voice)} onClick={() => toggleArrangementMute(occurrenceIndex, voice)}>{voice === 'chords' ? 'Chord' : voice[0].toUpperCase() + voice.slice(1)}</button>)}
+            </div>
+          </div>
+          <div className="occurrence-editor__layers">
+            <span>Layer focus</span>
+            {VOICE_IDS.map((voice) => (
+              <label key={voice}>{voice === 'chords' ? 'Chord' : voice[0].toUpperCase() + voice.slice(1)}
+                <select value={occurrence.layers[voice] ?? 'all'} onChange={(event) => setArrangementLayer(occurrenceIndex, voice, event.target.value as ArrangementLayerSelection)}>
+                  <option value="all">All enabled</option>
+                  <option value="primary">Primary only</option>
+                  <option value="shadow">Shadow only</option>
+                </select>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="sequencer-scroll" tabIndex={0} aria-label={`${pattern.steps.length}-step sequencer; ${composition.meter} meter`}>
         <div className="beat-ruler" style={{ minWidth: gridMinWidth, gridTemplateColumns: `78px repeat(${beatCount}, 1fr)` }} aria-hidden="true">

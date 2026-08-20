@@ -57,8 +57,8 @@ export const tutorialSteps: TutorialStep[] = [
   },
   {
     id: 'patterns', eyebrow: '06 · Move beyond a loop', title: 'Patterns become a song',
-    body: 'Patterns A–D are independent phrases. Copy, rotate, or transpose one, then append pattern letters to the Song strip.',
-    detail: 'Clicking a Song cell removes that bar. The glowing cell and pattern dot show what the transport is sounding.',
+    body: 'Patterns A–D are independent phrases. Append them to the Song strip, then select an occurrence to transform that repetition.',
+    detail: 'Transpose pitched voices, mute a voice this time, or focus it on Primary or Shadow without changing the source pattern. The glowing cell shows what is sounding.',
     selector: '.pattern-toolbar', view: 'sequence',
   },
   {

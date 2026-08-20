@@ -12,7 +12,7 @@ sequencer event -> Primary + Shadow -> voice filter/level -> shared effects -> l
 
 This adds timbral depth without adding sequencer lanes. Mute, solo, Mask automation, and channel level apply to both layers together.
 
-## Format v2
+## Layer data introduced in format v2
 
 `Composition.formatVersion` is independent of `styleVersion`. Missing versions and legacy flat `core`/`detune` voice data migrate to format v2 with:
 
@@ -21,7 +21,7 @@ This adds timbral depth without adding sequencer lanes. Mute, solo, Mask automat
 - Shadow disabled;
 - no patch provenance.
 
-The migration runs through `cloneComposition`, so scenes, IndexedDB snapshots, undo history, and imported project objects share one normalization path. The safe notation parser continues accepting legacy voice lines and emits canonical v2 notation when formatted.
+The migration runs through `cloneComposition`, so scenes, IndexedDB snapshots, undo history, and imported project objects share one normalization path. The safe notation parser continues accepting legacy voice lines. The current format is v3 because arrangement occurrences were added later; v2 layer data remains unchanged and canonical v3 notation includes it explicitly.
 
 ## Engines in the first slice
 

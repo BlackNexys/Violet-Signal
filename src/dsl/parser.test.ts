@@ -105,7 +105,7 @@ describe('Violet Signal DSL', () => {
     expect(roundTrip.ok && roundTrip.composition).toEqual(result.composition)
   })
 
-  it('round-trips explicit layered patches as format v2', () => {
+  it('round-trips explicit layered patches in the current format', () => {
     const layered = applyInstrumentPatch(makeEmptyComposition(), 'chords', 'veil-archive/glass-choir@1')
     const result = parseComposition(serializeComposition(layered))
     expect(result.ok).toBe(true)
@@ -131,5 +131,39 @@ describe('Violet Signal DSL', () => {
     if (!result.ok) return
     expect(result.composition.voices.chords.patchId).toBeNull()
     expect(result.composition.voices.chords.layers.primary.character).toBe(0.43)
+  })
+
+  it('round-trips transformed arrangement occurrences in canonical order', () => {
+    const source = serializeComposition(makeEmptyComposition()).replace(
+      /^ {2}arrangement:.*$/m,
+      '  arrangement: A C[layers=bass:primary+chords:shadow,mute=texture+pulse,transpose=12]',
+    )
+
+    const result = parseComposition(source)
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.composition.arrangement[1]).toEqual({
+      pattern: 'C',
+      transpose: 12,
+      mute: ['pulse', 'texture'],
+      layers: { bass: 'primary', chords: 'shadow' },
+    })
+    expect(serializeComposition(result.composition)).toContain(
+      'arrangement: A C[transpose=12,mute=pulse+texture,layers=chords:shadow+bass:primary]',
+    )
+    const roundTrip = parseComposition(serializeComposition(result.composition))
+    expect(roundTrip.ok && roundTrip.composition).toEqual(result.composition)
+  })
+
+  it.each([
+    ['A[transpose=25]', 'can range from -24 to 24'],
+    ['A[mute=signal]', 'mute can use'],
+    ['A[layers=chords:shadow+chords:primary]', 'more than once'],
+    ['A[rotate=2]', 'not an arrangement occurrence setting'],
+  ])('rejects invalid occurrence %s', (occurrence, message) => {
+    const result = parseComposition(`scene "Wrong Occurrence" {\n  arrangement: ${occurrence}\n}`)
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error.message).toContain(message)
   })
 })

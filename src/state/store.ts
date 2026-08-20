@@ -3,16 +3,19 @@ import { parseComposition, type FriendlyParseError } from '../dsl/parser'
 import { serializeComposition } from '../dsl/serializer'
 import {
   PATTERN_IDS,
+  VOICE_IDS,
   clamp,
   cloneComposition,
   clonePattern,
   getActivePattern,
   getPattern,
   isEngineCompatible,
+  makeArrangementOccurrence,
   noteToMidi,
   rotatePattern,
   transposePattern,
   type ApplyQuantization,
+  type ArrangementLayerSelection,
   type AutomationTarget,
   type Composition,
   type NoteLane,
@@ -84,6 +87,9 @@ interface AppState {
   addArrangementPattern: (id: PatternId) => void
   removeArrangementPattern: (index: number) => void
   clearArrangement: () => void
+  setArrangementTranspose: (index: number, semitones: number) => void
+  toggleArrangementMute: (index: number, voice: VoiceId) => void
+  setArrangementLayer: (index: number, voice: VoiceId, selection: ArrangementLayerSelection) => void
   setAutomationPoint: (target: AutomationTarget, step: number, value: number | null) => void
   applyStyle: (styleId: string, strength: number, preserve: StylePreserve, influences: StyleInfluence[]) => void
   setCodeDraft: (code: string) => void
@@ -165,7 +171,7 @@ export const useAppStore = create<AppState>((set, get) => {
         history: [],
         future: [],
         activeStep: -1,
-        playingPatternId: next.arrangement[0] ?? 'A',
+        playingPatternId: next.arrangement[0]?.pattern ?? 'A',
         arrangementIndex: 0,
         selectedStep: 0,
         exhaustion: 0,
@@ -266,12 +272,30 @@ export const useAppStore = create<AppState>((set, get) => {
       draft.patterns = draft.patterns.map((pattern) => pattern.id === transposed.id ? transposed : pattern)
     }),
     addArrangementPattern: (id) => commitMutation((draft) => {
-      if (draft.arrangement.length < 16) draft.arrangement.push(id)
+      if (draft.arrangement.length < 16) draft.arrangement.push(makeArrangementOccurrence(id))
     }),
     removeArrangementPattern: (index) => commitMutation((draft) => {
       if (draft.arrangement.length > 1) draft.arrangement.splice(index, 1)
     }),
-    clearArrangement: () => commitMutation((draft) => { draft.arrangement = [draft.activePatternId] }),
+    clearArrangement: () => commitMutation((draft) => { draft.arrangement = [makeArrangementOccurrence(draft.activePatternId)] }),
+    setArrangementTranspose: (index, semitones) => commitMutation((draft) => {
+      const occurrence = draft.arrangement[index]
+      if (occurrence) occurrence.transpose = Math.round(clamp(semitones, -24, 24))
+    }),
+    toggleArrangementMute: (index, voice) => commitMutation((draft) => {
+      const occurrence = draft.arrangement[index]
+      if (!occurrence) return
+      const muted = new Set(occurrence.mute)
+      if (muted.has(voice)) muted.delete(voice)
+      else muted.add(voice)
+      occurrence.mute = VOICE_IDS.filter((current) => muted.has(current))
+    }),
+    setArrangementLayer: (index, voice, selection) => commitMutation((draft) => {
+      const occurrence = draft.arrangement[index]
+      if (!occurrence) return
+      if (selection === 'all') delete occurrence.layers[voice]
+      else occurrence.layers[voice] = selection
+    }),
     setAutomationPoint: (target, stepIndex, value) => commitMutation((draft) => {
       getActivePattern(draft).automation[target][stepIndex] = value
     }),

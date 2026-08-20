@@ -4,10 +4,12 @@ import {
   clamp,
   cloneComposition,
   cloneStep,
+  makeArrangementOccurrence,
   makeEmptyComposition,
   rotatePattern,
   transposePattern,
   type Composition,
+  type PatternId,
   type Step,
   type VoiceId,
   type VoiceRecipe,
@@ -27,7 +29,7 @@ function buildScene(details: {
   sound: Partial<Composition['sound']>
   chordVoice?: VoiceRecipe
   voices?: Partial<Record<VoiceId, VoiceRecipe>>
-  arrangement?: Composition['arrangement']
+  arrangement?: PatternId[]
   steps: StepInput[]
 }): Composition {
   const base = makeEmptyComposition()
@@ -76,7 +78,7 @@ function buildScene(details: {
     if (index % 2 !== 0) step.bass = null
   })
   base.patterns = PATTERN_IDS.map((id) => ({ A: patternA, B: patternB, C: patternC, D: patternD })[id])
-  base.arrangement = details.arrangement ?? ['A', 'A', 'B', 'C']
+  base.arrangement = (details.arrangement ?? ['A', 'A', 'B', 'C']).map(makeArrangementOccurrence)
   return base
 }
 

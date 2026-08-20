@@ -5,10 +5,12 @@ import {
   STEP_COUNT_OPTIONS,
   isNote,
   isEngineCompatible,
+  makeArrangementOccurrence,
   makeEmptyComposition,
   noteToMidi,
   resizeComposition,
   type AutomationTarget,
+  type ArrangementOccurrence,
   type Composition,
   type PatternId,
   type ScaleMode,
@@ -53,6 +55,55 @@ function onOff(value: string, label: string, line: number, excerpt: string): boo
 function patternId(value: string, line: number, excerpt: string): PatternId {
   if (!PATTERN_IDS.includes(value as PatternId)) fail(`Pattern “${value}” is not available. Use A, B, C, or D.`, line, excerpt)
   return value as PatternId
+}
+
+function parseArrangementOccurrence(value: string, line: number, excerpt: string): ArrangementOccurrence {
+  const match = /^([a-d])(?:\[([^\]]+)\])?$/i.exec(value)
+  if (!match) fail(`“${value}” needs a pattern letter, optionally followed by [transpose=12,mute=pulse,layers=chords:shadow].`, line, excerpt)
+  const occurrence = makeArrangementOccurrence(patternId(match[1].toUpperCase(), line, excerpt))
+  if (!match[2]) return occurrence
+
+  const seen = new Set<string>()
+  for (const assignment of match[2].split(',')) {
+    const option = /^([a-z]+)=(.+)$/i.exec(assignment)
+    if (!option) fail(`“${assignment}” needs the form name=value inside the arrangement occurrence.`, line, excerpt)
+    const key = option[1].toLowerCase()
+    const raw = option[2].toLowerCase()
+    if (seen.has(key)) fail(`Occurrence setting “${key}” appears more than once.`, line, excerpt)
+    seen.add(key)
+    if (key === 'transpose') {
+      const transpose = numberIn(raw, 'Occurrence transpose', -24, 24, line, excerpt)
+      if (!Number.isInteger(transpose)) fail('Occurrence transpose needs a whole number from -24 to 24.', line, excerpt)
+      occurrence.transpose = transpose
+      continue
+    }
+    if (key === 'mute') {
+      if (raw === 'none') continue
+      const voices = raw.split('+')
+      for (const voice of voices) {
+        if (!VOICES.includes(voice as VoiceId)) fail(`Occurrence mute can use ${VOICES.join(', ')}.`, line, excerpt)
+        if (occurrence.mute.includes(voice as VoiceId)) fail(`Occurrence mute lists “${voice}” more than once.`, line, excerpt)
+        occurrence.mute.push(voice as VoiceId)
+      }
+      continue
+    }
+    if (key === 'layers') {
+      if (raw === 'none') continue
+      const configuredVoices = new Set<VoiceId>()
+      for (const layerAssignment of raw.split('+')) {
+        const layer = /^(chords|bass|pulse|texture):(all|primary|shadow)$/.exec(layerAssignment)
+        if (!layer) fail('Occurrence layers use voice:all, voice:primary, or voice:shadow.', line, excerpt)
+        const voice = layer[1] as VoiceId
+        if (configuredVoices.has(voice)) fail(`Occurrence layers configures “${voice}” more than once.`, line, excerpt)
+        configuredVoices.add(voice)
+        if (layer[2] !== 'all') occurrence.layers[voice] = layer[2] as 'primary' | 'shadow'
+      }
+      continue
+    }
+    fail(`“${key}” is not an arrangement occurrence setting.`, line, excerpt)
+  }
+  occurrence.mute = VOICES.filter((voice) => occurrence.mute.includes(voice))
+  return occurrence
 }
 
 function parseAssignments(value: string, stepCount: number, line: number, excerpt: string): Array<{ step: number; value: string; length?: number }> {
@@ -313,8 +364,8 @@ export function parseComposition(source: string): ParseResult {
         }
         case 'active': composition.activePatternId = patternId(value.toUpperCase(), lineNumber, rawLine); break
         case 'arrangement': {
-          const arrangement = value.split(/\s+/).map((id) => patternId(id.toUpperCase(), lineNumber, rawLine))
-          if (!arrangement.length || arrangement.length > 16) fail('Arrangement needs between 1 and 16 pattern letters.', lineNumber, rawLine)
+          const arrangement = value.split(/\s+/).map((token) => parseArrangementOccurrence(token, lineNumber, rawLine))
+          if (!arrangement.length || arrangement.length > 16) fail('Arrangement needs between 1 and 16 pattern occurrences.', lineNumber, rawLine)
           composition.arrangement = arrangement; break
         }
         case 'memory': composition.sound.memory = numberIn(value, 'Memory', 0, 1, lineNumber, rawLine); break

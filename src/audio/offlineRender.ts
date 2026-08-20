@@ -1,17 +1,12 @@
 import * as Tone from 'tone'
-import { clamp, getPattern, stepsPerBeat, type Composition, type VoiceId } from '../model/composition'
+import { clamp, getPattern, stepsPerBeat, type Composition } from '../model/composition'
+import { occurrenceAllowsVoice, occurrenceLayerSelection, resolveArrangementOccurrence, transposeOccurrenceNote, transposeOccurrenceNotes } from '../model/arrangement'
 import { measurePeak, peakNormalizationGain } from './normalization'
 import { mapOverclock } from './overclock'
 import { advanceFatigue, resolveSequencerStep, type FatigueState } from './sequencing'
 import { delayFeedback, delayWet, INPUT_GAIN, LIMITER_CEILING_DB, masterOutputDb, reverbWet } from './signalPath'
 import { mapFracture, mapVeil } from './soundverse'
 import { LayeredVoiceSource } from './instrumentSource'
-
-function audible(composition: Composition, id: VoiceId): boolean {
-  const anySolo = Object.values(composition.voices).some((voice) => voice.solo)
-  const voice = composition.voices[id]
-  return !voice.mute && (!anySolo || voice.solo)
-}
 
 function encodeWav(buffer: AudioBuffer, gain: number): Blob {
   const channels = Math.min(2, buffer.numberOfChannels)
@@ -48,7 +43,7 @@ function encodeWav(buffer: AudioBuffer, gain: number): Blob {
 
 export async function renderCompositionToWav(composition: Composition): Promise<Blob> {
   const secondsPerStep = 60 / composition.bpm / 4
-  const totalSteps = composition.arrangement.reduce((sum, patternId) => sum + getPattern(composition, patternId).steps.length, 0)
+  const totalSteps = composition.arrangement.reduce((sum, occurrence) => sum + getPattern(composition, occurrence.pattern).steps.length, 0)
   const duration = totalSteps * secondsPerStep + 4
   const rendered = await Tone.Offline(async () => {
     const mapped = mapOverclock(composition.sound.overclock)
@@ -84,8 +79,8 @@ export async function renderCompositionToWav(composition: Composition): Promise<
     let lastChord = ['C4', 'Eb4', 'G4']
     let fatigue: FatigueState = { heat: 0, exhaustion: 0 }
     let stepCursor = 0
-    composition.arrangement.forEach((patternId, bar) => {
-      const pattern = getPattern(composition, patternId)
+    composition.arrangement.forEach((_, bar) => {
+      const { occurrence, pattern } = resolveArrangementOccurrence(composition, bar)
       pattern.steps.forEach((step, index) => {
         const time = (stepCursor + index) * secondsPerStep
         const resolved = resolveSequencerStep(composition, pattern, index, bar, fatigue.exhaustion, false, secondsPerStep)
@@ -100,23 +95,25 @@ export async function renderCompositionToWav(composition: Composition): Promise<
         chorus.wet.setValueAtTime(automatedVeil.wet, time)
         crusher.wet.setValueAtTime(automatedFracture.wet, time)
         crusher.bits.setValueAtTime(automatedFracture.bits, time)
-        if (step.notes.length && resolved.shouldPlay) lastChord = [...step.notes]
-        if (resolved.shouldPlay && (step.notes.length || resolved.isGhostChord) && audible(composition, 'chords')) {
-          const chord = step.notes.length ? step.notes : lastChord
+        const chordAllowed = occurrenceAllowsVoice(composition, occurrence, 'chords')
+        if (step.notes.length && resolved.shouldPlay && chordAllowed) lastChord = [...step.notes]
+        if (resolved.shouldPlay && chordAllowed && (step.notes.length || resolved.isGhostChord)) {
+          const chord = transposeOccurrenceNotes(step.notes.length ? step.notes : lastChord, occurrence)
           const intendedDuration = resolved.isGhostChord ? secondsPerStep * 0.45 : secondsPerStep * step.chordLength * 0.94
           const noteDuration = resolved.ratchets > 1 ? Math.min(intendedDuration, ratchetSpacing * 0.82) : intendedDuration
-          for (const triggerTime of triggerTimes) chords.trigger(chord, noteDuration, triggerTime, clamp(step.velocity * (resolved.isGhostChord ? 0.3 : 0.72), 0.08, 0.78))
+          for (const triggerTime of triggerTimes) chords.trigger(chord, noteDuration, triggerTime, clamp(step.velocity * (resolved.isGhostChord ? 0.3 : 0.72), 0.08, 0.78), occurrenceLayerSelection(occurrence, 'chords'))
         }
-        if (resolved.shouldPlay && step.bass && audible(composition, 'bass')) {
+        if (resolved.shouldPlay && step.bass && occurrenceAllowsVoice(composition, occurrence, 'bass')) {
           const intendedDuration = secondsPerStep * step.bassLength * 0.92
           const noteDuration = resolved.ratchets > 1 ? Math.min(intendedDuration, ratchetSpacing * 0.82) : intendedDuration
-          for (const triggerTime of triggerTimes) bass.trigger(step.bass, noteDuration, triggerTime, clamp(step.velocity * 0.72, 0.12, 0.72))
+          const bassNote = transposeOccurrenceNote(step.bass, occurrence)
+          for (const triggerTime of triggerTimes) bass.trigger(bassNote, noteDuration, triggerTime, clamp(step.velocity * 0.72, 0.12, 0.72), occurrenceLayerSelection(occurrence, 'bass'))
         }
-        if (resolved.shouldPlay && (step.drum || resolved.isGhostDrum) && audible(composition, 'pulse')) {
-          for (const triggerTime of triggerTimes) pulse.trigger(resolved.isGhostDrum ? 'C1' : index % stepsPerBeat(composition.meter) === 0 ? 'C1' : 'G1', Math.min(secondsPerStep * 0.5, ratchetSpacing * 0.72), triggerTime, clamp(step.velocity * (resolved.isGhostDrum ? 0.26 : 0.62), 0.08, 0.64))
+        if (resolved.shouldPlay && occurrenceAllowsVoice(composition, occurrence, 'pulse') && (step.drum || resolved.isGhostDrum)) {
+          for (const triggerTime of triggerTimes) pulse.trigger(resolved.isGhostDrum ? 'C1' : index % stepsPerBeat(composition.meter) === 0 ? 'C1' : 'G1', Math.min(secondsPerStep * 0.5, ratchetSpacing * 0.72), triggerTime, clamp(step.velocity * (resolved.isGhostDrum ? 0.26 : 0.62), 0.08, 0.64), occurrenceLayerSelection(occurrence, 'pulse'))
         }
-        if (resolved.shouldPlay && step.texture && audible(composition, 'texture')) {
-          for (const triggerTime of triggerTimes) texture.trigger(null, Math.min(secondsPerStep * 1.7, ratchetSpacing * 0.82), triggerTime, clamp(step.velocity * 0.28, 0.05, 0.28))
+        if (resolved.shouldPlay && step.texture && occurrenceAllowsVoice(composition, occurrence, 'texture')) {
+          for (const triggerTime of triggerTimes) texture.trigger(null, Math.min(secondsPerStep * 1.7, ratchetSpacing * 0.82), triggerTime, clamp(step.velocity * 0.28, 0.05, 0.28), occurrenceLayerSelection(occurrence, 'texture'))
         }
         fatigue = advanceFatigue(fatigue, resolved.overclock)
       })

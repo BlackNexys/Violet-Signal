@@ -26,7 +26,7 @@ A scene begins with a quoted name, contains `control: value` lines, and ends wit
 
 ```text
 scene "Your Scene Name" {
-  format-version: 2
+  format-version: 3
   style: darkwave
   style-version: 1
   influences: ambient=0.2
@@ -39,7 +39,7 @@ scene "Your Scene Name" {
   lock: on
   patterns: A B C D
   active: A
-  arrangement: A A B C
+  arrangement: A A[transpose=12] B[mute=pulse] C[layers=chords:shadow]
 
   // Voice, effect, pattern, and automation lines go here.
 }
@@ -64,7 +64,7 @@ For example, in 4/4 steps `01 05 09 13` are the four quarter-note downbeats. Ste
 
 | Control | Accepted value | Meaning |
 | --- | --- | --- |
-| `format-version` | Whole number `1`–`2` | Composition schema. The app currently writes `2`; missing values import as legacy v1. |
+| `format-version` | Whole number `1`–`3` | Composition schema. The app currently writes `3`; missing values import as legacy v1. |
 | `style` | Any built-in style id | Primary production vocabulary. `world` remains accepted for older projects. |
 | `style-version` | Whole number `1`–`999` | Recipe schema version written by the app; normally leave it unchanged. |
 | `influences` | `style-id=0..0.8`, or `none` | Optional secondary style blend; the Style Lab currently writes one influence. |
@@ -77,10 +77,27 @@ For example, in 4/4 steps `01 05 09 13` are the four quarter-note downbeats. Ste
 | `lock` | `on` or `off` | Enables or disables scale locking in the visual instrument. |
 | `patterns` | `A B C D` exactly once each | Declares the four available patterns. Keep this line unchanged. |
 | `active` | `A`, `B`, `C`, or `D` | Pattern shown for editing. The arrangement decides what playback sounds. |
-| `arrangement` | Between 1 and 16 pattern letters | Bar order, for example `A A B C A D`. |
+| `arrangement` | Between 1 and 16 pattern occurrences | Phrase order plus optional occurrence transforms. Neutral entries remain bare letters. |
 | `output` | `-36`–`-6` | Master level before final limiting and WAV normalization. Start near `-12`. |
 
 Use integer seeds when asking an AI for variations. Reusing the same seed keeps probabilistic details deterministic.
+
+### Arrangement occurrence transformations
+
+An arrangement entry begins with `A`, `B`, `C`, or `D`. Optional brackets change only that occurrence; they never rewrite the source pattern.
+
+```text
+arrangement: A A[transpose=12] B[mute=pulse+texture] C[layers=chords:shadow+bass:primary]
+```
+
+Inside the brackets, comma-separated settings have a fixed meaning:
+
+- `transpose` is a whole number from `-24` to `24` semitones and affects Chord and Bass notes only.
+- `mute` lists one or more voices joined by `+`: `chords`, `bass`, `pulse`, or `texture`.
+- `layers` lists `voice:all`, `voice:primary`, or `voice:shadow` assignments joined by `+`.
+- `shadow` explicitly plays the configured Shadow for that occurrence even when its normal enabled switch is off. `all` follows the normal Shadow enabled state.
+
+Canonical formatting orders settings as `transpose`, `mute`, then `layers`, and orders voices as Chord, Bass, Pulse, Texture. Pattern automation resolves first; these occurrence transforms resolve afterward. Performance gestures and final audio safety mapping remain later stages.
 
 WAV export reproduces the written gain staging and effects, then peak-normalizes the completed file to `−1 dBFS`. The `output` value still changes how strongly the signal reaches the drive/limiter stages, but it no longer leaves an otherwise healthy export unnecessarily quiet. Peak normalization is not commercial loudness mastering.
 
@@ -366,7 +383,11 @@ scale         = NOTE_ROOT (minor | major)
 lock          = on | off
 patterns      = A B C D
 active        = A | B | C | D
-arrangement   = 1..16 values from A | B | C | D
+arrangement   = 1..16 OCCURRENCE values
+OCCURRENCE    = (A | B | C | D) ["[" OCCURRENCE_OPTION ["," OCCURRENCE_OPTION...] "]"]
+transpose     = integer -24..24
+mute          = chords | bass | pulse | texture, joined by +
+layers        = VOICE:(all | primary | shadow), joined by +
 waveform      = sine | triangle | square | sawtooth
 filter_type   = lowpass | bandpass | highpass
 resonance     = number 0..12

@@ -1,6 +1,6 @@
 # Instrument Sound and Layer Expansion Plan
 
-Status: in progress — CLI foundation completed; arrangement occurrence design is next
+Status: in progress — CLI foundation and first arrangement-occurrence slice completed
 Date: 2026-08-19  
 Last planning update: 2026-08-20
 Last implementation update: 2026-08-20
@@ -15,7 +15,7 @@ The first vertical slice is implemented:
 - Patch selection, editable layer controls, Custom provenance, undo/redo, and queued playback-boundary application.
 - Safe notation, CodeMirror support, IndexedDB/project normalization, documentation, and production-browser layered WAV coverage.
 
-The headless validation and formatting CLI is implemented with human-readable and JSON diagnostics, canonical check/write modes, stable exit codes, a separate Node-targeted bundle, and integration coverage. The next format change will be designed around arrangement occurrences and their transformations. The Phase 0 profiling gate for dual, metal, and pluck remains planned after the occurrence foundation; Chrome Wound, Fractured Relay, and Low Cinema remain later content work.
+The headless validation and formatting CLI is implemented with human-readable and JSON diagnostics, canonical check/write modes, stable exit codes, a separate Node-targeted bundle, and integration coverage. Format v3 arrangement occurrences are also implemented with transpose, per-voice mute, Primary/Shadow selection, legacy migration, notation, UI editing, and shared live/offline resolution. Headless-browser rendering is next. The Phase 0 profiling gate for dual, metal, and pluck remains planned after that; Chrome Wound, Fractured Relay, and Low Cinema remain later content work.
 
 ## Post-v2 feedback roadmap
 
@@ -78,26 +78,24 @@ Exit criteria:
 
 ## Milestone B — Arrangement occurrence foundation
 
+Status: completed 2026-08-20.
+
 Replace `PatternId[]` as the persisted arrangement concept with explicit occurrences. Exact TypeScript names may change, but the model should resemble:
 
 ```ts
 interface ArrangementOccurrence {
   pattern: PatternId
   transpose: number
-  rotate: number
   mute: VoiceId[]
   layers: Partial<Record<VoiceId, 'all' | 'primary' | 'shadow'>>
-  effects: Partial<OccurrenceEffectModifiers>
 }
 ```
 
 Every field must have a neutral value so legacy entries migrate without audible change:
 
 - `transpose: 0`
-- `rotate: 0`
 - `mute: []`
 - missing layer selections mean `all`
-- missing effect modifiers mean no change
 
 ### Resolution semantics
 
@@ -122,15 +120,15 @@ Rotation should rotate the whole pattern memory, including its automation lanes.
 
 Effect transformations should be bounded modifiers rather than hidden replacement values. The resolver must document whether each modifier is an offset or multiplier and clamp only at the final safety-mapping stage. This preserves the audible contribution of pattern automation.
 
-### Notation checkpoint
+### Adopted notation
 
-Arrangement occurrences likely require format v3. Before implementation, compare a compact inline form such as:
+Arrangement occurrences use format v3 and a compact inline form:
 
 ```text
 arrangement: A A[transpose=12] B[mute=pulse] C[rotate=2]
 ```
 
-against an explicitly named occurrence form. Select the grammar using these criteria:
+The chosen grammar provides:
 
 - readable diffs;
 - friendly line-specific errors;
@@ -138,7 +136,7 @@ against an explicitly named occurrence form. Select the grammar using these crit
 - canonical formatting;
 - room for layer selection and effect modifiers without making one line opaque.
 
-Do not commit the file grammar merely because it mirrors the first TypeScript shape. Prototype parser errors and representative compositions first.
+Neutral occurrences remain bare letters. Canonical formatting orders fields as transpose, mute, then layers, and orders voice lists as Chord, Bass, Pulse, Texture. Rotation and effect modifiers remain deliberately unsupported until their resolution semantics are implemented.
 
 Exit criteria:
 
@@ -148,6 +146,8 @@ Exit criteria:
 - Live and offline event plans resolve the same notes, steps, layers, mutes, and modifiers.
 
 ## Milestone C — First expressive transformations
+
+Status: completed 2026-08-20.
 
 Ship the occurrence model through a musically complete vertical slice:
 
@@ -210,8 +210,8 @@ Its design checkpoint must decide whether Signal receives its own pattern lane, 
 ## Revised delivery sequence
 
 1. **Completed:** Package `violet validate` and `violet format` with stable diagnostics.
-2. Specify format-v3 arrangement occurrences and build the shared occurrence resolver.
-3. Ship transpose, occurrence mute, and Primary/Shadow selection end to end.
+2. **Completed:** Specify format-v3 arrangement occurrences and build the shared occurrence resolver.
+3. **Completed:** Ship transpose, occurrence mute, and Primary/Shadow selection end to end.
 4. Add headless-browser `violet render` and verify WAV parity.
 5. Add scale modes and complete dual, metal, and pluck profiling and patches.
 6. Add occurrence rotation and bounded effect modifiers.

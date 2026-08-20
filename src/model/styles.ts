@@ -6,6 +6,7 @@ import {
   cloneComposition,
   defaultBass,
   getPattern,
+  makeArrangementOccurrence,
   noteToMidi,
   resizeComposition,
   transposeNote,
@@ -260,6 +261,6 @@ export function applyStyle(
     }
   }
   if (!preserve.patterns) generatePatterns(next, style)
-  if (!preserve.arrangement && amount >= 0.5) next.arrangement = [...style.arrangement]
+  if (!preserve.arrangement && amount >= 0.5) next.arrangement = style.arrangement.map(makeArrangementOccurrence)
   return next
 }

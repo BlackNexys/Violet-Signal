@@ -85,7 +85,7 @@ The sequencer groups cells according to the selected meter. `/4` beats read `1 e
 
 ### Build an arrangement
 
-Four independent patterns can be copied, rotated, transposed, and appended to an arrangement of up to sixteen bars. The transport plays the arrangement in order and shows both the sounding pattern and current arrangement position.
+Four independent patterns can be appended to an arrangement of up to sixteen occurrences. Select an occurrence to transpose its pitched events, mute voices for that repetition, or focus each voice on all enabled layers, Primary only, or Shadow only. The source pattern remains unchanged, and the transport shows both the sounding pattern and current occurrence. The model and precedence rules are documented in [`project-notes/arrangement-occurrences.md`](project-notes/arrangement-occurrences.md).
 
 Chord, Bass, Pulse, and Texture voices each have Primary and optional Shadow layers plus a shared selectable filter, ADSR envelope, level, mute, and solo settings. Every source is synthesized or procedurally generated; no remote samples are used.
 
@@ -111,7 +111,7 @@ For a complete human- and AI-oriented editing reference—including every accept
 
 ```text
 scene "Rain Behind Glass" {
-  format-version: 2
+  format-version: 3
   style: darkwave
   style-version: 1
   influences: ambient=0.15
@@ -124,7 +124,7 @@ scene "Rain Behind Glass" {
   lock: on
   patterns: A B C D
   active: A
-  arrangement: A A B C
+  arrangement: A A[transpose=12] B[mute=pulse] C[layers=chords:shadow]
   voice chords: triangle volume=-10 cutoff=2550 attack=0.12 decay=0.62 sustain=0.64 release=2.2 mute=off solo=off
   voice bass: triangle volume=-9 cutoff=950 attack=0.012 decay=0.3 sustain=0.5 release=0.7 mute=off solo=off
   memory: 0.42
@@ -154,7 +154,7 @@ The CodeMirror editor provides syntax coloring, suggestions, formatting, error-l
 
 ## Architecture
 
-- `src/model/` — serializable composition, patterns, steps, voices, automation, transformations, versioned style registry, and starter scenes.
+- `src/model/` — serializable composition, patterns, arrangement occurrences, shared transformation resolution, voices, automation, versioned style registry, and starter scenes.
 - `src/dsl/` — deterministic parser, sparse serializer, code highlighting ranges, and change summaries.
 - `src/state/` — Zustand actions, synchronization, bounded composition undo/redo, selection, recording, arrangement position, and quantized pending edits.
 - `src/audio/` — persistent Tone.js graph, Web Audio transport scheduling, frame-synchronized visual updates, shared seeded event/effect mappings, live recorder, and offline WAV rendering. See the [`timing model`](project-notes/timing.md) and [`live/offline rendering model`](project-notes/audio-rendering.md).
@@ -185,4 +185,4 @@ The audio graph is created only after a user gesture. A shared source factory bu
 
 ## Next valuable milestone
 
-Promote arrangement entries from bare pattern ids to explicit occurrences with bounded transpose, voice mute, and Primary/Shadow selection. This makes each repetition musically distinct without duplicating its source pattern. The adopted sequence—including later rotation, scale modes, engine vocabulary, interpolated automation, ties, and per-voice effect sends—is maintained in [`notes/instrument-sound-and-layer-expansion-plan.md`](notes/instrument-sound-and-layer-expansion-plan.md).
+Add headless-browser `violet render` using the production offline audio path, then extend arrangement occurrences with whole-memory rotation. The adopted sequence—including scale modes, engine vocabulary, interpolated automation, ties, and per-voice effect sends—is maintained in [`notes/instrument-sound-and-layer-expansion-plan.md`](notes/instrument-sound-and-layer-expansion-plan.md).
