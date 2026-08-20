@@ -78,6 +78,15 @@ describe('shared composition state', () => {
     expect(state.code).toContain('shift A: 05=-0.08')
   })
 
+  it('projects automation interpolation into the model and notation', () => {
+    useAppStore.getState().setAutomationMode('veil', 'linear')
+    const state = useAppStore.getState()
+    expect(getActivePattern(state.composition).automationModes.veil).toBe('linear')
+    expect(state.code).toContain('automate veil A linear:')
+    useAppStore.getState().undo()
+    expect(getActivePattern(useAppStore.getState().composition).automationModes.veil).toBe('hold')
+  })
+
   it('applies a style as one undoable composition transformation', () => {
     useAppStore.getState().applyStyle('glitch', 1, replaceEverything, [{ id: 'ambient', amount: 0.2 }])
     const styled = useAppStore.getState()

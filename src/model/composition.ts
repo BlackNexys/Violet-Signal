@@ -24,6 +24,7 @@ export type InstrumentEngine = 'subtractive' | 'fm' | 'am' | 'dual' | 'pluck' | 
 export type NoteLane = 'notes' | 'bass'
 export type StepLane = NoteLane | 'drum' | 'texture'
 export type AutomationTarget = 'mask' | 'memory' | 'veil' | 'fracture' | 'ghost' | 'overclock'
+export type AutomationMode = 'hold' | 'linear'
 export type OccurrenceEffectTarget = AutomationTarget
 export type ApplyQuantization = 'step' | 'beat' | 'bar'
 
@@ -89,12 +90,14 @@ export interface SoundSettings {
 }
 
 export type AutomationLanes = Record<AutomationTarget, Array<number | null>>
+export type AutomationModes = Record<AutomationTarget, AutomationMode>
 
 export interface Pattern {
   id: PatternId
   name: string
   steps: Step[]
   automation: AutomationLanes
+  automationModes: AutomationModes
 }
 
 export interface ArrangementOccurrence {
@@ -162,6 +165,15 @@ export const makeAutomationLanes = (stepCount = DEFAULT_STEP_COUNT): AutomationL
   fracture: Array.from({ length: stepCount }, () => null),
   ghost: Array.from({ length: stepCount }, () => null),
   overclock: Array.from({ length: stepCount }, () => null),
+})
+
+export const makeAutomationModes = (): AutomationModes => ({
+  mask: 'hold',
+  memory: 'hold',
+  veil: 'hold',
+  fracture: 'hold',
+  ghost: 'hold',
+  overclock: 'hold',
 })
 
 const DEFAULT_WAVEFORMS: Record<VoiceId, Waveform> = {
@@ -260,6 +272,7 @@ export const makeEmptyPattern = (id: PatternId, stepCount = DEFAULT_STEP_COUNT):
   name: `Pattern ${id}`,
   steps: Array.from({ length: stepCount }, makeEmptyStep),
   automation: makeAutomationLanes(stepCount),
+  automationModes: makeAutomationModes(),
 })
 
 export function makeArrangementOccurrence(pattern: PatternId): ArrangementOccurrence {
@@ -405,6 +418,8 @@ export function cloneStep(step: Step): Step {
 export function clonePattern(pattern: Pattern): Pattern {
   const stepCount = pattern.steps.length || DEFAULT_STEP_COUNT
   const lane = (target: AutomationTarget) => Array.from({ length: stepCount }, (_, index) => pattern.automation[target]?.[index] ?? null)
+  const sourceModes = (pattern as Pattern & { automationModes?: Partial<AutomationModes> }).automationModes
+  const mode = (target: AutomationTarget): AutomationMode => sourceModes?.[target] === 'linear' ? 'linear' : 'hold'
   return {
     ...pattern,
     steps: pattern.steps.map(cloneStep),
@@ -415,6 +430,14 @@ export function clonePattern(pattern: Pattern): Pattern {
       fracture: lane('fracture'),
       ghost: lane('ghost'),
       overclock: lane('overclock'),
+    },
+    automationModes: {
+      mask: mode('mask'),
+      memory: mode('memory'),
+      veil: mode('veil'),
+      fracture: mode('fracture'),
+      ghost: mode('ghost'),
+      overclock: mode('overclock'),
     },
   }
 }
@@ -502,7 +525,9 @@ export function resizePattern(pattern: Pattern, stepCount: number): Pattern {
 function clonePatternWithoutResize(pattern: Pattern): Pattern {
   const lanes = makeAutomationLanes(pattern.steps.length || DEFAULT_STEP_COUNT)
   for (const target of Object.keys(lanes) as AutomationTarget[]) lanes[target] = [...(pattern.automation[target] ?? lanes[target])]
-  return { ...pattern, steps: pattern.steps.map(cloneStep), automation: lanes }
+  const modes = makeAutomationModes()
+  for (const target of Object.keys(modes) as AutomationTarget[]) modes[target] = pattern.automationModes?.[target] === 'linear' ? 'linear' : 'hold'
+  return { ...pattern, steps: pattern.steps.map(cloneStep), automation: lanes, automationModes: modes }
 }
 
 export function resizeComposition(composition: Composition, stepCount: number): Composition {

@@ -202,18 +202,18 @@ emphasis A: 01=0.92 05=0.62 09=0.84 13=0.58
 
 ## Step automation
 
-Automation uses `automate control pattern: step=value`.
+Automation uses `automate control pattern [mode]: step=value`. Hold is the backward-compatible default and is omitted by canonical formatting; add `linear` when values should move between points.
 
 ```text
 automate mask A: 01=1100 05=2400 09=4200 13=1700
 automate memory A: 01=0.18 13=0.52
-automate veil A: 01=0.35 09=0.72
-automate fracture A: 01=0.04 15=0.55
+automate veil A linear: 01=0.35 09=0.72
+automate fracture A linear: 01=0.04 15=0.55
 automate ghost A: 01=0.08 13=0.28
 automate overclock A: 01=0.05 09=0.32
 ```
 
-Automation is held from its latest point until another point changes it, including across the loop boundary. `mask` accepts `80`–`12000`; Memory, Veil, Fracture, Ghost, and Overclock accept `0`–`1`. Use `none` when a lane has no automation.
+**Hold** keeps the latest authored value until another point changes it. **Linear** calculates each intervening step between the previous and next authored points. Both modes are circular: Hold carries the final value across the loop boundary, while Linear continues the final-to-first slope across it. A lane with one point is constant; a lane without points uses the global control value. `mask` accepts `80`–`12000`; Memory, Veil, Fracture, Ghost, and Overclock accept `0`–`1`. Use `none` when a lane has no automation, and note that a Linear lane can retain its mode while empty.
 
 Automation note lengths are not meaningful. Write `09=0.72`, not `09=0.72~4`.
 
@@ -336,6 +336,7 @@ The Style Lab can transform tempo, timing, voices, effects, harmony, patterns, a
 | --- | --- |
 | `Step … is outside this …-step bar/pattern` | Use positions inside the configured `steps` value. |
 | `needs the form 05=value` | Note, bass, emphasis, and automation tokens need `step=value`. |
+| `optional “hold” or “linear” interpolation` | Remove the unsupported curve name or choose Hold/Linear. |
 | `is not a step from 01 to 16` | Pulse and Texture use bare step numbers such as `01 05 09 13`. |
 | `is not a note I recognize` | Use `C4`, `Eb4`, or `F#3`; keep the note letter uppercase. |
 | `Note length can be…` | Use only `~1`, `~2`, `~3`, `~4`, or `~8`. |
@@ -409,6 +410,7 @@ emphasis      = STEP=number(0.1..1) [...] | none
 chance        = STEP=number(0..1) [...] | none
 ratchet       = STEP=integer(1..4) [...] | none
 shift         = STEP=number(-0.45..0.45) [...] | none
+automation_key = automate EFFECT_TARGET (A | B | C | D) [hold | linear]
 automation    = STEP=value [...] | none
 mask_value    = 80..12000
 effect_value  = 0..1

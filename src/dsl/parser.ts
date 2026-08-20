@@ -321,16 +321,21 @@ export function parseComposition(source: string): ParseResult {
         }
         continue
       }
-      const automationMatch = /^automate\s+(mask|memory|veil|fracture|ghost|overclock)\s+([a-d])$/i.exec(key)
+      const automationMatch = /^automate\s+(mask|memory|veil|fracture|ghost|overclock)\s+([a-d])(?:\s+(hold|linear))?$/i.exec(key)
       if (automationMatch) {
         const target = automationMatch[1].toLowerCase() as AutomationTarget
         const id = patternId(automationMatch[2].toUpperCase(), lineNumber, rawLine)
-        const lane = composition.patterns.find((item) => item.id === id)!.automation[target]
+        const pattern = composition.patterns.find((item) => item.id === id)!
+        const lane = pattern.automation[target]
+        pattern.automationModes[target] = automationMatch[3]?.toLowerCase() === 'linear' ? 'linear' : 'hold'
         for (const assignment of parseAssignments(value, composition.stepCount, lineNumber, rawLine)) {
           const bounds: Record<AutomationTarget, [number, number]> = { mask: [80, 12000], memory: [0, 1], veil: [0, 1], fracture: [0, 1], ghost: [0, 1], overclock: [0, 1] }
           lane[assignment.step] = numberIn(assignment.value, `Automated ${target}`, ...bounds[target], lineNumber, rawLine)
         }
         continue
+      }
+      if (/^automate\s+/i.test(key)) {
+        fail('Automation needs “automate target pattern” with optional “hold” or “linear” interpolation.', lineNumber, rawLine)
       }
 
       switch (key) {

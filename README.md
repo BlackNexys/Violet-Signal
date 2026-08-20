@@ -94,7 +94,7 @@ Chord, Bass, Pulse, and Texture voices each have Primary and optional Shadow lay
 
 ### Add motion and perform
 
-Mask, Memory, Ghost, and Overclock have step-addressed automation lanes. Automation is held from its most recent point until the next point. Temporary **Pressure** and **Freeze Memory** gestures affect performance without rewriting the saved composition.
+Mask, Memory, Veil, Fracture, Ghost, and Overclock have step-addressed automation lanes. Each lane can Hold its latest point or interpolate Linearly toward the next point, including across the loop seam. Temporary **Pressure** and **Freeze Memory** gestures affect performance without rewriting the saved composition.
 
 Arm step recording to place touch/computer-key notes into the currently sounding step. Played notes still audition normally when recording is not armed.
 
@@ -188,4 +188,4 @@ The audio graph is created only after a user gesture. A shared source factory bu
 
 ## Next valuable milestone
 
-Add Hold/Linear automation interpolation through one shared resolver used by playback, WAV rendering, previews, and occurrence effects. The adopted sequence—including true ties and per-voice effect sends—is maintained in [`notes/instrument-sound-and-layer-expansion-plan.md`](notes/instrument-sound-and-layer-expansion-plan.md).
+Add true ties and legato source lifecycles with defined behavior across loops, rests, ratchets, probability, panic, engine replacement, and Glide. The adopted sequence—including per-voice effect sends—is maintained in [`notes/instrument-sound-and-layer-expansion-plan.md`](notes/instrument-sound-and-layer-expansion-plan.md).

@@ -18,6 +18,7 @@ import {
   transposePattern,
   type ApplyQuantization,
   type ArrangementLayerSelection,
+  type AutomationMode,
   type AutomationTarget,
   type Composition,
   type NoteLane,
@@ -97,6 +98,7 @@ interface AppState {
   setArrangementLayer: (index: number, voice: VoiceId, selection: ArrangementLayerSelection) => void
   setArrangementEffect: (index: number, target: OccurrenceEffectTarget, value: number) => void
   setAutomationPoint: (target: AutomationTarget, step: number, value: number | null) => void
+  setAutomationMode: (target: AutomationTarget, mode: AutomationMode) => void
   applyStyle: (styleId: string, strength: number, preserve: StylePreserve, influences: StyleInfluence[]) => void
   setCodeDraft: (code: string) => void
   formatCode: () => void
@@ -317,6 +319,9 @@ export const useAppStore = create<AppState>((set, get) => {
     }),
     setAutomationPoint: (target, stepIndex, value) => commitMutation((draft) => {
       getActivePattern(draft).automation[target][stepIndex] = value
+    }),
+    setAutomationMode: (target, mode) => commitMutation((draft) => {
+      getActivePattern(draft).automationModes[target] = mode === 'linear' ? 'linear' : 'hold'
     }),
     applyStyle: (styleId, strength, preserve, influences) => {
       const current = get().composition

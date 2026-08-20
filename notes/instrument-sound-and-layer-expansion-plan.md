@@ -1,6 +1,6 @@
 # Instrument Sound and Layer Expansion Plan
 
-Status: in progress — occurrence rotation and effect modifiers completed
+Status: in progress — Hold/Linear automation interpolation completed
 Date: 2026-08-19  
 Last planning update: 2026-08-20
 Last implementation update: 2026-08-20
@@ -15,7 +15,7 @@ The first vertical slice is implemented:
 - Patch selection, editable layer controls, Custom provenance, undo/redo, and queued playback-boundary application.
 - Safe notation, CodeMirror support, IndexedDB/project normalization, documentation, and production-browser layered WAV coverage.
 
-The headless CLI is implemented with validation, formatting, and production-path WAV rendering. Format v3 arrangement occurrences provide transpose, whole-memory rotation, per-voice mute, Primary/Shadow selection, and bounded effect modifiers. Dorian, Phrygian, harmonic minor, melodic minor, and pentatonic share one interval registry across notation, keyboard choices, and chord suggestions. Dual and metal sources plus a bounded managed pluck pool run through the shared live/offline adapter; Chrome Wound and the first Fractured Relay patches exercise them in production-browser WAV coverage. Hold/Linear automation interpolation is next.
+The headless CLI is implemented with validation, formatting, and production-path WAV rendering. Format v3 arrangement occurrences provide transpose, whole-memory rotation, per-voice mute, Primary/Shadow selection, and bounded effect modifiers. Dorian, Phrygian, harmonic minor, melodic minor, and pentatonic share one interval registry across notation, keyboard choices, and chord suggestions. Dual and metal sources plus a bounded managed pluck pool run through the shared live/offline adapter; Chrome Wound and the first Fractured Relay patches exercise them in production-browser WAV coverage. Hold/Linear automation now shares one circular resolver across lane previews, live playback, offline WAV rendering, and occurrence effects. True ties and legato source lifecycles are next.
 
 ## Post-v2 feedback roadmap
 
@@ -181,13 +181,15 @@ This milestone completes Chrome Wound before expanding Fractured Relay and Low C
 
 ## Milestone E — Automation interpolation and ties
 
+Status: Hold/Linear interpolation completed 2026-08-20; ties remain pending.
+
 Automation should progress from the current held-value lanes to explicit interpolation modes:
 
 - **Hold** preserves current behavior and migration compatibility.
 - **Linear** interpolates between authored points.
 - **Ease** remains optional until Hold and Linear are audible, deterministic, and understandable in the editor.
 
-Implement one pure automation resolver used by the live engine, offline renderer, UI previews, and occurrence-effect resolution.
+The implemented pure automation resolver is used by the live engine, offline renderer, UI previews, and occurrence-effect resolution. Missing persisted modes migrate to Hold. Linear values interpolate at each step and continue through the final-to-first loop segment; empty lanes use the global fallback and one-point lanes remain constant. Canonical notation omits default Hold and adds `linear` after the pattern id when selected.
 
 Real ties and legato require source adapters to expose attack, pitch change, and release lifecycles rather than relying only on `triggerAttackRelease`. Tie semantics must cover loop boundaries, ratchets, rests, Ghost/Chance decisions, panic, engine replacement, and Glide. Do not encode ties as unusually long gate values.
 
@@ -221,7 +223,7 @@ Its design checkpoint must decide whether Signal receives its own pattern lane, 
 4. **Completed:** Add headless-browser `violet render` and verify the packaged WAV path.
 5. **Completed:** Add scale modes and complete dual, metal, and pluck profiling and patches.
 6. **Completed:** Add occurrence rotation and bounded effect modifiers.
-7. Add Hold/Linear automation interpolation.
+7. **Completed:** Add Hold/Linear automation interpolation.
 8. Add true ties and legato source lifecycles.
 9. Refactor the effect graph and expose per-voice sends.
 10. Reassess the optional Signal voice using real composition feedback from the preceding features.

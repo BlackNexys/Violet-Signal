@@ -1,4 +1,5 @@
-import { clamp, type ArrangementOccurrence, type Composition, type OccurrenceEffectTarget, type Pattern } from '../model/composition'
+import { resolveAutomationValue } from '../model/automation'
+import { clamp, type ArrangementOccurrence, type AutomationMode, type Composition, type OccurrenceEffectTarget, type Pattern } from '../model/composition'
 import { mapOverclock, type OverclockMapping } from './overclock'
 import { seededBipolar, seededUnit } from './random'
 import { humanizedStepOffset } from './timing'
@@ -23,13 +24,8 @@ export interface FatigueState {
   exhaustion: number
 }
 
-export function automatedValue(lane: Array<number | null>, step: number, fallback: number): number {
-  if (lane[step] !== null) return lane[step]!
-  for (let distance = 1; distance <= lane.length; distance += 1) {
-    const index = (step - distance + lane.length) % lane.length
-    if (lane[index] !== null) return lane[index]!
-  }
-  return fallback
+export function automatedValue(lane: Array<number | null>, step: number, fallback: number, mode: AutomationMode = 'hold'): number {
+  return resolveAutomationValue(lane, step, fallback, mode)
 }
 
 export function resolveSequencerStep(
@@ -48,10 +44,12 @@ export function resolveSequencerStep(
     if (target === 'mask') return automated * (modifier ?? 1)
     return clamp(automated + (modifier ?? 0), 0, 1)
   }
-  const automatedOverclock = effectValue('overclock', automatedValue(pattern.automation.overclock, step, composition.sound.overclock))
+  const automation = (target: OccurrenceEffectTarget, fallback: number) =>
+    resolveAutomationValue(pattern.automation[target], step, fallback, pattern.automationModes?.[target] ?? 'hold')
+  const automatedOverclock = effectValue('overclock', automation('overclock', composition.sound.overclock))
   const overclock = clamp(automatedOverclock + (pressure ? 0.3 : 0), 0, 1)
   const mapped = mapOverclock(overclock, exhaustion)
-  const ghost = effectValue('ghost', automatedValue(pattern.automation.ghost, step, composition.sound.ghost))
+  const ghost = effectValue('ghost', automation('ghost', composition.sound.ghost))
   const ghostChance = clamp(ghost * 0.18 + mapped.activityBoost, 0, 0.42)
   const humanizedOffset = humanizedStepOffset(
     step,
@@ -66,10 +64,10 @@ export function resolveSequencerStep(
   return {
     overclock,
     mapped,
-    mask: effectValue('mask', automatedValue(pattern.automation.mask, step, composition.voices.chords.cutoff)),
-    memory: effectValue('memory', automatedValue(pattern.automation.memory, step, composition.sound.memory)),
-    veil: effectValue('veil', automatedValue(pattern.automation.veil, step, composition.sound.veil)),
-    fracture: effectValue('fracture', automatedValue(pattern.automation.fracture, step, composition.sound.fracture)),
+    mask: effectValue('mask', automation('mask', composition.voices.chords.cutoff)),
+    memory: effectValue('memory', automation('memory', composition.sound.memory)),
+    veil: effectValue('veil', automation('veil', composition.sound.veil)),
+    fracture: effectValue('fracture', automation('fracture', composition.sound.fracture)),
     ghost,
     timingOffset: step === 0 ? 0 : clamp(humanizedOffset + swingOffset + microOffset, earliestOffset, stepDuration * 0.48),
     shouldPlay: seededUnit(composition.seed, cycle, step, 4) <= clamp(current.probability ?? 1, 0, 1),

@@ -105,6 +105,29 @@ describe('Violet Signal DSL', () => {
     expect(roundTrip.ok && roundTrip.composition).toEqual(result.composition)
   })
 
+  it('round-trips Linear automation while canonicalizing explicit Hold', () => {
+    const result = parseComposition(`scene "Interpolated Memory" {
+  automate memory A linear: 01=0.2 09=0.8
+  automate veil A hold: 01=0.3 09=0.7
+}`)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+
+    expect(result.composition.patterns[0].automationModes).toMatchObject({ memory: 'linear', veil: 'hold' })
+    const canonical = serializeComposition(result.composition)
+    expect(canonical).toContain('automate memory A linear: 01=0.2 09=0.8')
+    expect(canonical).toContain('automate veil A: 01=0.3 09=0.7')
+    expect(canonical).not.toContain('automate veil A hold:')
+    const roundTrip = parseComposition(canonical)
+    expect(roundTrip.ok && roundTrip.composition).toEqual(result.composition)
+  })
+
+  it('rejects unsupported automation interpolation modes', () => {
+    const result = parseComposition('scene "Unsupported Curve" {\n  automate veil A ease: 01=0.2 09=0.8\n}')
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error.message).toContain('optional “hold” or “linear”')
+  })
+
   it('round-trips explicit layered patches in the current format', () => {
     const layered = applyInstrumentPatch(makeEmptyComposition(), 'chords', 'veil-archive/glass-choir@1')
     const result = parseComposition(serializeComposition(layered))

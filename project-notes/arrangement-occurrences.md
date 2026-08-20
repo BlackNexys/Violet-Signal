@@ -46,7 +46,7 @@ Mask effect values are multipliers from `0.25` to `4`; Memory, Veil, Fracture, G
 The shared resolver in `src/model/arrangement.ts` is used by live and offline playback:
 
 ```text
-pattern data and held automation
+pattern data and resolved Hold/Linear automation
     -> occurrence rotation / transpose / mute / layer focus / effect modifier
     -> live performance gestures
     -> bounded audio safety mapping

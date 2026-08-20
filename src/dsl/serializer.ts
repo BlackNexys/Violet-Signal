@@ -118,7 +118,8 @@ export function serializeComposition(composition: Composition): string {
     lines.push(`  ratchet ${pattern.id}: ${expressionAssignments(pattern, 'ratchets', 1)}`)
     lines.push(`  shift ${pattern.id}: ${expressionAssignments(pattern, 'microShift', 0)}`)
     for (const target of ['mask', 'memory', 'veil', 'fracture', 'ghost', 'overclock'] as AutomationTarget[]) {
-      lines.push(`  automate ${target} ${pattern.id}: ${automationAssignments(pattern, target)}`)
+      const mode = pattern.automationModes?.[target] === 'linear' ? ' linear' : ''
+      lines.push(`  automate ${target} ${pattern.id}${mode}: ${automationAssignments(pattern, target)}`)
     }
     lines.push('')
   }
@@ -157,7 +158,7 @@ export function summarizeCompositionChange(current: Composition, pending: Compos
   if (current.meter !== pending.meter || current.stepCount !== pending.stepCount || current.swing !== pending.swing) changes.push('timing & groove')
   if (JSON.stringify(current.arrangement) !== JSON.stringify(pending.arrangement)) changes.push('arrangement')
   if (JSON.stringify(current.voices) !== JSON.stringify(pending.voices)) changes.push('voice settings')
-  if (JSON.stringify(current.patterns) !== JSON.stringify(pending.patterns)) changes.push('pattern notes')
+  if (JSON.stringify(current.patterns) !== JSON.stringify(pending.patterns)) changes.push('patterns & automation')
   if (JSON.stringify(current.sound) !== JSON.stringify(pending.sound)) changes.push('effects')
   return changes.slice(0, 3)
 }

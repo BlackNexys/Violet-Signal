@@ -74,4 +74,16 @@ describe('shared sequencer resolution', () => {
     expect(resolved.ghost).toBe(1)
     expect(resolved.overclock).toBeCloseTo(0.5)
   })
+
+  it('applies occurrence modifiers after Linear automation', () => {
+    const composition = makeEmptyComposition()
+    const pattern = getPattern(composition, 'A')
+    pattern.automation.memory[0] = 0.2
+    pattern.automation.memory[8] = 0.8
+    pattern.automationModes.memory = 'linear'
+    const occurrence = makeArrangementOccurrence('A')
+    occurrence.effects.memory = 0.2
+
+    expect(resolveSequencerStep(composition, pattern, 4, 0, 0, false, 0.125, occurrence).memory).toBeCloseTo(0.7)
+  })
 })

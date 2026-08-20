@@ -23,6 +23,7 @@ import {
   type StepLane,
 } from '../model/composition'
 import { arrangementOccurrenceDescription, arrangementOccurrenceLabel } from '../model/arrangement'
+import { resolveAutomationValue } from '../model/automation'
 import { useAppStore } from '../state/store'
 
 const shortNotes = (notes: string[]) => notes.length ? `${notes[0].replace(/-?\d/, '')}${notes.length > 1 ? `+${notes.length - 1}` : ''}` : '·'
@@ -72,6 +73,7 @@ export function SequencerPanel() {
   const setArrangementLayer = useAppStore((state) => state.setArrangementLayer)
   const setArrangementEffect = useAppStore((state) => state.setArrangementEffect)
   const setAutomationPoint = useAppStore((state) => state.setAutomationPoint)
+  const setAutomationMode = useAppStore((state) => state.setAutomationMode)
   const setStepExpression = useAppStore((state) => state.setStepExpression)
   const pattern = getActivePattern(composition)
   const inspectedStep = Math.min(selectedStep, pattern.steps.length - 1)
@@ -85,8 +87,10 @@ export function SequencerPanel() {
   const gridStyle = { '--step-count': pattern.steps.length, '--grid-min-width': `${gridMinWidth}px` } as React.CSSProperties
   const suggestions = chordSuggestions(composition)
   const automation = pattern.automation[automationTarget]
+  const automationMode = pattern.automationModes?.[automationTarget] ?? 'hold'
   const automationConfig = automationBounds[automationTarget]
   const fallbackAutomation = automationTarget === 'mask' ? composition.voices.chords.cutoff : composition.sound[automationTarget]
+  const resolvedAutomation = automation.map((_, index) => resolveAutomationValue(automation, index, fallbackAutomation, automationMode))
   const occurrenceIndex = Math.min(selectedOccurrenceIndex, composition.arrangement.length - 1)
   const occurrence = composition.arrangement[occurrenceIndex]
   const occurrenceEffectConfig = occurrenceEffectBounds[occurrenceEffectTarget]
@@ -274,16 +278,20 @@ export function SequencerPanel() {
           <select value={automationTarget} onChange={(event) => setAutomationTarget(event.target.value as AutomationTarget)}>
             {(Object.keys(automationBounds) as AutomationTarget[]).map((target) => <option key={target} value={target}>{target} · {automationBounds[target].label}</option>)}
           </select>
+          <select aria-label="Automation interpolation" value={automationMode} onChange={(event) => setAutomationMode(automationTarget, event.target.value === 'linear' ? 'linear' : 'hold')}>
+            <option value="hold">Hold</option>
+            <option value="linear">Linear</option>
+          </select>
           <button type="button" disabled={automation[inspectedStep] === null} onClick={() => setAutomationPoint(automationTarget, inspectedStep, null)}>Clear point</button>
         </div>
         <div className="automation-lane" style={{ '--step-count': automation.length } as React.CSSProperties}>
           {automation.map((value, index) => (
-            <button type="button" key={index} className={`${value !== null ? 'has-point' : ''}${inspectedStep === index ? ' is-selected' : ''}`} onClick={() => { selectStep(index); if (value === null) setAutomationPoint(automationTarget, index, fallbackAutomation) }} aria-label={`${automationTarget} step ${index + 1}: ${value ?? 'no point'}`}>
-              <i style={{ '--automation': value === null ? 0 : (value - automationConfig.min) / (automationConfig.max - automationConfig.min) } as React.CSSProperties} />
+            <button type="button" key={index} className={`${value !== null ? 'has-point' : ''}${inspectedStep === index ? ' is-selected' : ''}`} onClick={() => { selectStep(index); if (value === null) setAutomationPoint(automationTarget, index, resolvedAutomation[index]) }} aria-label={`${automationTarget} step ${index + 1}: ${value === null ? `${resolvedAutomation[index]} ${automationMode} preview` : `${value} point`}`}>
+              <i style={{ '--automation': (resolvedAutomation[index] - automationConfig.min) / (automationConfig.max - automationConfig.min) } as React.CSSProperties} />
             </button>
           ))}
         </div>
-        <input type="range" min={automationConfig.min} max={automationConfig.max} step={automationConfig.step} value={automation[inspectedStep] ?? fallbackAutomation} aria-label={`${automationTarget} at selected step`} onChange={(event) => setAutomationPoint(automationTarget, inspectedStep, Number(event.target.value))} />
+        <input type="range" min={automationConfig.min} max={automationConfig.max} step={automationConfig.step} value={automation[inspectedStep] ?? resolvedAutomation[inspectedStep]} aria-label={`${automationTarget} at selected step`} onChange={(event) => setAutomationPoint(automationTarget, inspectedStep, Number(event.target.value))} />
       </div>
     </section>
   )

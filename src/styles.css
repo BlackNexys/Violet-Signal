@@ -413,9 +413,9 @@ button:disabled { cursor: not-allowed; opacity: 0.35; }
 .step-expression select { height: 27px; border: 1px solid #3d3348; border-radius: 3px; background: #121019; color: #c0b5c3; font-size: 9px; }
 
 .automation-editor { margin-top: 10px; padding: 11px 12px; border: 1px solid #30283a; border-radius: 4px; background: #09080d; }
-.automation-heading { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.automation-heading { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 8px; }
 .automation-heading > span { color: var(--muted); font: 9px var(--font-data); text-transform: uppercase; letter-spacing: .08em; }
-.automation-heading select { height: 30px; flex: 1; border: 1px solid #3a3045; border-radius: 3px; background: #121019; color: #aaa0af; font-size: 10px; }
+.automation-heading select { height: 30px; flex: 1 1 120px; border: 1px solid #3a3045; border-radius: 3px; background: #121019; color: #aaa0af; font-size: 10px; }
 .automation-heading button { height: 30px; border: 0; background: transparent; color: #918596; font-size: 10px; }
 .automation-lane { display: grid; grid-template-columns: repeat(var(--step-count, 16), 1fr); gap: 3px; height: 36px; }
 .automation-lane button { display: flex; align-items: flex-end; justify-content: center; border: 1px solid #29242e; border-radius: 2px; background: #141117; padding: 3px; }

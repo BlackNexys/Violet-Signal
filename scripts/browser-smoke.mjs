@@ -38,6 +38,10 @@ try {
   await page.getByRole('combobox', { name: 'Scale mode' }).selectOption('phrygian')
   await page.waitForFunction(() => document.querySelector('.cm-content')?.textContent?.includes('scale: F# phrygian'))
   expect((await page.locator('.touch-keyboard button').nth(1).innerText()).includes('G'), 'Phrygian scale keyboard did not use its minor second')
+  const automationInterpolation = page.getByRole('combobox', { name: 'Automation interpolation' })
+  await automationInterpolation.selectOption('linear')
+  expect(await automationInterpolation.inputValue() === 'linear', 'Linear automation mode did not remain selected')
+  await page.getByRole('button', { name: /mask step 2: .* linear preview/ }).waitFor()
 
   await page.getByRole('button', { name: 'Style Lab', exact: true }).click()
   await page.getByRole('heading', { name: 'Style Lab' }).waitFor()
@@ -172,6 +176,9 @@ try {
   expect(expandedEngineCode.includes('patch pulse: chrome-wound/iron-pulse@1'), 'metal pulse patch did not reach code')
   expect(expandedEngineCode.includes('patch texture: chrome-wound/arc-ash@1'), 'metal texture patch did not reach code')
 
+  await automationInterpolation.selectOption('linear')
+  expect(await automationInterpolation.inputValue() === 'linear', 'Linear automation mode did not reach the offline render composition')
+
   const renderStartedAt = Date.now()
   const wavDownload = page.waitForEvent('download', { timeout: 120_000 })
   await page.getByRole('button', { name: 'WAV', exact: true }).click()
@@ -198,7 +205,7 @@ try {
   await page.screenshot({ path: 'artifacts/violet-signal-narrow.png', fullPage: true })
 
   if (failures.length) throw new Error(failures.join('\n'))
-  console.log('Browser smoke passed: scales, styles, arrangement occurrences, expanded engines, synchronization, parser protection, audio effects, capture, WAV, and responsive tabs.')
+  console.log('Browser smoke passed: scales, styles, arrangement occurrences, Hold/Linear automation, expanded engines, synchronization, parser protection, audio effects, capture, WAV, and responsive tabs.')
 } finally {
   await browser.close()
 }
