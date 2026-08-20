@@ -12,7 +12,19 @@ Mono subtractive, FM, AM, and dual sources call the Tone monophonic pitch-change
 
 Resolved pattern automation precedes occurrence effects. Mask uses a `0.25`–`4` multiplier; Memory, Veil, Fracture, Ghost, and Overclock use bounded `-1`–`1` offsets. Live Pressure/Freeze gestures follow those written values, and the final audio mapping performs the processor safety clamps. In particular, the occurrence Mask multiplier remains available to interact with performance brightness before the shared `80`–`12000 Hz` filter bound. Both renderers therefore use the same precedence: `pattern data/automation -> occurrence transform -> performance gesture -> safety mapping`.
 
-The offline synthesis graph mirrors the live graph: each voice's Primary and optional Shadow sources are created through the same source factory, then four filtered voice channels feed the same input trim, drive, Fracture, Veil, Memory, Environment, master trim, and `−1 dB` limiter. Engine Character, layer pitch/level/response, bass filter-envelope behavior, pulse pitch decay, chord Overclock shaping, and Texture noise color are also matched.
+The offline synthesis graph mirrors the live graph through one shared routing factory. Each voice's Primary and optional Shadow sources are created through the same source factory and enter a common voice filter/level before routing:
+
+```text
+Primary + Shadow -> voice filter/level -> trimmed dry bus --------------------|
+                                       -> Fracture send -> shared processor --|
+                                       -> Veil send ----> shared processor --|-> input trim -> drive -> master -> −1 dB limiter
+                                       -> Memory send --> shared processor ---|
+                                       -> Environment --> shared processor ---|
+```
+
+Each per-voice send is bounded to `0`–`1`; legacy compositions without sends normalize all four to `1`. The dry branch uses a `0.78` trim and each send input uses a `0.72` trim before the processor, with the existing input trim and limiter protecting the recombined parallel sum. These constants are identical in both renderers. Mute and solo happen upstream of the fork, so they silence both dry and effect input. The processors are shared rather than duplicated per voice or layer.
+
+Global and step-addressed Fracture, Veil, and Memory values shape the shared processors and return gains after the stable per-voice sends; Environment uses the same global-return model. Drive now sits after the dry/effect returns. That placement deliberately replaces the old serial interactions while keeping legacy voices routed to every processor, using conservative gain staging and final limiting as the compatibility strategy. Engine Character, layer pitch/level/response, bass filter-envelope behavior, pulse pitch decay, chord Overclock shaping, and Texture noise color remain matched.
 
 WAV output is stereo, 44.1 kHz, 16-bit PCM. After rendering, the highest absolute PCM sample is normalized to `−1 dBFS`. Silence is left untouched. This removes accidental playback-level differences while retaining the balance, dynamics, distortion, limiting, and effect interaction created before the normalization stage.
 

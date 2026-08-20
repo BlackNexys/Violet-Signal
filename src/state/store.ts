@@ -19,6 +19,7 @@ import {
   type ApplyQuantization,
   type ArrangementLayerSelection,
   type AutomationMode,
+  type EffectSendTarget,
   type AutomationTarget,
   type Composition,
   type NoteLane,
@@ -72,7 +73,8 @@ interface AppState {
   resetScene: () => void
   renameComposition: (name: string) => void
   updateSound: <K extends keyof SoundSettings>(key: K, value: SoundSettings[K]) => void
-  updateVoice: <K extends Exclude<keyof VoiceSettings, 'patchId' | 'layers'>>(voice: VoiceId, key: K, value: VoiceSettings[K]) => void
+  updateVoice: <K extends Exclude<keyof VoiceSettings, 'patchId' | 'layers' | 'sends'>>(voice: VoiceId, key: K, value: VoiceSettings[K]) => void
+  updateVoiceSend: (voice: VoiceId, target: EffectSendTarget, value: number) => void
   updateVoiceLayer: <K extends keyof VoiceLayerSettings>(voice: VoiceId, slot: LayerSlot, key: K, value: VoiceLayerSettings[K]) => void
   applyInstrumentPatch: (voice: VoiceId, patchId: string) => void
   updateRoot: (key: 'bpm' | 'masterVolume' | 'scaleLock' | 'scaleRoot' | 'scaleMode', value: number | boolean | string) => void
@@ -196,6 +198,9 @@ export const useAppStore = create<AppState>((set, get) => {
     updateVoice: (voice, key, value) => commitMutation((draft) => {
       ;(draft.voices[voice] as unknown as Record<string, unknown>)[key] = value
       if (key !== 'mute' && key !== 'solo') draft.voices[voice].patchId = null
+    }),
+    updateVoiceSend: (voice, target, value) => commitMutation((draft) => {
+      draft.voices[voice].sends[target] = clamp(value, 0, 1)
     }),
     updateVoiceLayer: (voice, slot, key, value) => commitMutation((draft) => {
       if (key === 'engine' && !isEngineCompatible(voice, value as VoiceLayerSettings['engine'])) return

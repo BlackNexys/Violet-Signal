@@ -22,11 +22,13 @@ describe('layered instrument packs', () => {
 
   it('applies a patch without mutating the source composition or registry', () => {
     const original = makeEmptyComposition()
+    original.voices.chords.sends.memory = 0.23
     const registryBefore = structuredClone(INSTRUMENT_PATCHES)
     const next = applyInstrumentPatch(original, 'chords', 'veil-archive/glass-choir@1')
     expect(original.voices.chords.patchId).toBeNull()
     expect(next.voices.chords).toMatchObject({ patchId: 'veil-archive/glass-choir@1' })
     expect(next.voices.chords.layers.shadow).toMatchObject({ enabled: true, engine: 'fm', octave: 1 })
+    expect(next.voices.chords.sends.memory).toBe(0.23)
     expect(INSTRUMENT_PATCHES).toEqual(registryBefore)
   })
 
@@ -35,6 +37,7 @@ describe('layered instrument packs', () => {
     const channel = { ...current.voices.bass } as unknown as Record<string, unknown>
     delete channel.layers
     delete channel.patchId
+    delete channel.sends
     const legacy = {
       ...current,
       formatVersion: undefined,
@@ -47,6 +50,7 @@ describe('layered instrument packs', () => {
     expect(migrated.formatVersion).toBe(FORMAT_VERSION)
     expect(migrated.voices.bass.layers.primary).toMatchObject({ enabled: true, engine: 'subtractive', waveform: 'square', detune: -9 })
     expect(migrated.voices.bass.layers.shadow.enabled).toBe(false)
+    expect(migrated.voices.bass.sends).toEqual({ fracture: 1, veil: 1, memory: 1, environment: 1 })
     expect(cloneComposition(migrated)).toEqual(migrated)
   })
 })

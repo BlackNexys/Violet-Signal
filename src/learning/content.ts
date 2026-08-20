@@ -52,7 +52,7 @@ export const tutorialSteps: TutorialStep[] = [
   {
     id: 'shape', eyebrow: '05 · Shape the material', title: 'Sound, Layers, Body, and Afterimage',
     body: 'Choose a voice patch or combine a Primary source with an optional Shadow. Then shape their shared filter, envelope, and channel level.',
-    detail: 'Layer Character changes the synthesis tone. Veil adds chorus width; Fracture reduces digital detail; performance gestures remain unwritten.',
+    detail: 'Layer Character changes the synthesis tone. Depth sends place this voice into shared Fracture, Veil, Memory, and Environment returns; performance gestures remain unwritten.',
     selector: '.voice-tabs', view: 'instrument',
   },
   {
@@ -139,6 +139,7 @@ export const cheatSections: CheatSection[] = [
       { term: 'Shadow', description: 'An optional second synthesis layer triggered by the same events.' },
       { term: 'Character', description: 'A bounded macro for the selected engine tone.' },
       { term: 'Body', description: 'ADSR envelope, velocity, and note duration.' },
+      { term: 'Depth', description: 'How much of the selected voice enters each shared effect return.' },
       { term: 'Mask', description: 'Selectable low-, band-, or high-pass filter, cutoff, and resonance.' },
       { term: 'Memory', description: 'Delay, repetition, and retained fragments.' },
       { term: 'Veil', description: 'Stereo chorus and modulated width.' },

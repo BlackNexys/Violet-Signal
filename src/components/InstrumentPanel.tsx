@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Activity, AudioWaveform, CloudRain, Gauge, Radio, RotateCcw, ShieldCheck, Snowflake, Zap } from 'lucide-react'
+import { Activity, AudioWaveform, CloudRain, Gauge, GitBranch, Radio, RotateCcw, ShieldCheck, Snowflake, Zap } from 'lucide-react'
 import {
   ENGINES_BY_VOICE,
   SCALE_MODES,
@@ -55,6 +55,7 @@ export function InstrumentPanel({ audition }: InstrumentPanelProps) {
   const memoryFreeze = useAppStore((state) => state.memoryFreeze)
   const updateSound = useAppStore((state) => state.updateSound)
   const updateVoice = useAppStore((state) => state.updateVoice)
+  const updateVoiceSend = useAppStore((state) => state.updateVoiceSend)
   const updateVoiceLayer = useAppStore((state) => state.updateVoiceLayer)
   const applyInstrumentPatch = useAppStore((state) => state.applyInstrumentPatch)
   const updateRoot = useAppStore((state) => state.updateRoot)
@@ -184,8 +185,19 @@ export function InstrumentPanel({ audition }: InstrumentPanelProps) {
         </div>
       </div>
 
+      <div className="signal-block send-block">
+        <div className="signal-title"><GitBranch size={15} /><span>Depth <small>{voiceLabels[selectedVoice]} effect sends</small></span></div>
+        <p className="send-description">Choose how much of this voice enters each shared effect return.</p>
+        <div className="two-controls">
+          <ControlSlider label="Fracture send" conventional="Bit-reduction depth" value={voice.sends.fracture} min={0} max={1} step={0.01} format={(value) => `${Math.round(value * 100)}%`} onChange={(value) => updateVoiceSend(selectedVoice, 'fracture', value)} />
+          <ControlSlider label="Veil send" conventional="Chorus depth" value={voice.sends.veil} min={0} max={1} step={0.01} format={(value) => `${Math.round(value * 100)}%`} onChange={(value) => updateVoiceSend(selectedVoice, 'veil', value)} />
+          <ControlSlider label="Memory send" conventional="Delay depth" value={voice.sends.memory} min={0} max={1} step={0.01} format={(value) => `${Math.round(value * 100)}%`} onChange={(value) => updateVoiceSend(selectedVoice, 'memory', value)} />
+          <ControlSlider label="Environment send" conventional="Reverb depth" value={voice.sends.environment} min={0} max={1} step={0.01} format={(value) => `${Math.round(value * 100)}%`} onChange={(value) => updateVoiceSend(selectedVoice, 'environment', value)} />
+        </div>
+      </div>
+
       <div className="signal-block effects-block">
-        <div className="signal-title"><CloudRain size={15} /><span>Afterimage <small>Shared effects</small></span></div>
+        <div className="signal-title"><CloudRain size={15} /><span>Afterimage <small>Shared effect character</small></span></div>
         <div className="two-controls">
           <ControlSlider label="Memory" conventional="Delay" value={composition.sound.memory} min={0} max={1} step={0.01} onChange={(value) => updateSound('memory', value)} />
           <ControlSlider label="Environment" conventional="Reverb" value={composition.sound.environment} min={0} max={1} step={0.01} onChange={(value) => updateSound('environment', value)} />

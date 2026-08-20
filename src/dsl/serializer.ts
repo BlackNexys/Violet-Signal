@@ -48,7 +48,7 @@ function automationAssignments(pattern: Pattern, target: AutomationTarget): stri
 function voiceLine(composition: Composition, id: VoiceId): string {
   const voice = composition.voices[id]
   const layer = voice.layers.primary
-  return `  voice ${id}: ${layer.waveform} engine=${layer.engine} octave=${layer.octave} detune=${amount(layer.detune)} layer-level=${amount(layer.level)} character=${amount(layer.character)} attack-scale=${amount(layer.attackScale)} release-scale=${amount(layer.releaseScale)} filter=${voice.filterType} cutoff=${amount(voice.cutoff)} resonance=${amount(voice.resonance)} glide=${amount(voice.glide)} volume=${amount(voice.volume)} attack=${amount(voice.attack)} decay=${amount(voice.decay)} sustain=${amount(voice.sustain)} release=${amount(voice.release)} mute=${voice.mute ? 'on' : 'off'} solo=${voice.solo ? 'on' : 'off'}`
+  return `  voice ${id}: ${layer.waveform} engine=${layer.engine} octave=${layer.octave} detune=${amount(layer.detune)} layer-level=${amount(layer.level)} character=${amount(layer.character)} attack-scale=${amount(layer.attackScale)} release-scale=${amount(layer.releaseScale)} filter=${voice.filterType} cutoff=${amount(voice.cutoff)} resonance=${amount(voice.resonance)} glide=${amount(voice.glide)} volume=${amount(voice.volume)} attack=${amount(voice.attack)} decay=${amount(voice.decay)} sustain=${amount(voice.sustain)} release=${amount(voice.release)} send-fracture=${amount(voice.sends.fracture)} send-veil=${amount(voice.sends.veil)} send-memory=${amount(voice.sends.memory)} send-environment=${amount(voice.sends.environment)} mute=${voice.mute ? 'on' : 'off'} solo=${voice.solo ? 'on' : 'off'}`
 }
 
 function shadowLine(composition: Composition, id: VoiceId): string {

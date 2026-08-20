@@ -41,7 +41,7 @@ Fracture maps one normalized value to parallel bit reduction:
 
 The bound preserves impact and limiter headroom while making digital erosion audible. It is not a destructive file conversion.
 
-Both controls are serializable, undoable, editable in Code, automatable per pattern step, available in the visual Instrument, and shared by live playback and offline WAV rendering.
+Both controls are serializable, undoable, editable in Code, automatable per pattern step, available in the visual Instrument, and shared by live playback and offline WAV rendering. Each voice also has a bounded send into Fracture, Veil, Memory, and Environment, allowing different depths while retaining one shared processor of each kind.
 
 ## Notation
 

@@ -143,6 +143,7 @@ export function applyInstrumentPatch(composition: Composition, role: VoiceId, pa
   const next = cloneComposition(composition)
   next.voices[role] = {
     ...patch.settings,
+    sends: { ...next.voices[role].sends },
     layers: {
       primary: { ...patch.settings.layers.primary },
       shadow: { ...patch.settings.layers.shadow },
@@ -171,6 +172,7 @@ export function validateInstrumentPatches(): string[] {
     if (!inRange(patch.settings.cutoff, 80, 12_000)) errors.push(`${patch.id} cutoff is out of range`)
     if (!inRange(patch.settings.resonance, 0, 12)) errors.push(`${patch.id} resonance is out of range`)
     if (!inRange(patch.settings.volume, -36, -4)) errors.push(`${patch.id} volume is out of range`)
+    for (const [target, send] of Object.entries(patch.settings.sends)) if (!inRange(send, 0, 1)) errors.push(`${patch.id} ${target} send is out of range`)
   }
   return errors
 }

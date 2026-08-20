@@ -7,7 +7,8 @@ Status: expanded engine vocabulary implemented 2026-08-20.
 Violet Signal still has four musical voices: Chord, Bass, Pulse, and Texture. Each voice now mixes a required **Primary** source with an optional **Shadow** source before entering its existing channel filter and level.
 
 ```text
-sequencer event -> Primary + Shadow -> voice filter/level -> shared effects -> limiter
+sequencer event -> Primary + Shadow -> voice filter/level -> dry bus --------|
+                                                      -> four voice sends ---|-> shared parallel returns -> drive -> limiter
 ```
 
 This adds timbral depth without adding sequencer lanes. Mute, solo, Mask automation, and channel level apply to both layers together.
@@ -53,7 +54,7 @@ The first registry contains:
 - **Chrome Wound** — Razor Assembly and Reactor use dual oscillators; Iron Pulse and Arc Ash combine membrane, metal, and noise layers.
 - **Fractured Relay** — Wire Below provides a managed physical-pluck bass; Relay Click provides a clipped metallic transient.
 
-Patch ids use `pack-id/patch-id@version`. Applying a patch copies its complete settings into the composition. Playback never requires a registry lookup, so a future pack revision cannot silently alter an existing project. Changing a sound-defining layer, filter, envelope, or channel value clears provenance to **Custom**; mute and solo do not.
+Patch ids use `pack-id/patch-id@version`. Applying a patch copies its complete sound settings into the composition while preserving that voice's four effect sends. Playback never requires a registry lookup, so a future pack revision cannot silently alter an existing project. Changing a sound-defining layer, filter, envelope, or channel value clears provenance to **Custom**; routing sends, mute, and solo do not.
 
 ## Adding a built-in patch
 
@@ -75,7 +76,7 @@ The browser smoke test applies dual, pluck, and metal patches across all four vo
 ## Current boundaries
 
 - Exactly two layer slots per voice.
-- No per-layer effects, automation, mute, or solo.
+- Per-voice sends feed four shared processors; there are no per-layer effects, sends, automation, mute, or solo.
 - No samples, remote assets, or new runtime dependencies.
-- Pluck articulation is intentionally short and pooled; true ties remain a separate lifecycle milestone.
+- Pluck articulation is intentionally short and pooled. Explicit ties retain shared strings and re-excite only changed pitches because a physical-pluck delay line cannot be continuously repitched.
 - Pack provenance is descriptive; concrete serialized values are authoritative.

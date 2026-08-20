@@ -100,6 +100,18 @@ describe('shared composition state', () => {
     expect(getActivePattern(useAppStore.getState().composition).steps[0]).toMatchObject({ bass: null, bassTie: false })
   })
 
+  it('updates a bounded voice send without discarding patch provenance', () => {
+    useAppStore.getState().applyInstrumentPatch('bass', 'veil-archive/undertow@1')
+    const patchId = useAppStore.getState().composition.voices.bass.patchId
+    useAppStore.getState().updateVoiceSend('bass', 'memory', 0.37)
+    const state = useAppStore.getState()
+    expect(state.composition.voices.bass.sends.memory).toBe(0.37)
+    expect(state.composition.voices.bass.patchId).toBe(patchId)
+    expect(state.code).toContain('send-memory=0.37')
+    useAppStore.getState().updateVoiceSend('bass', 'veil', 4)
+    expect(useAppStore.getState().composition.voices.bass.sends.veil).toBe(1)
+  })
+
   it('applies a style as one undoable composition transformation', () => {
     useAppStore.getState().applyStyle('glitch', 1, replaceEverything, [{ id: 'ambient', amount: 0.2 }])
     const styled = useAppStore.getState()

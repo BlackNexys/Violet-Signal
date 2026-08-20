@@ -164,6 +164,25 @@ describe('Violet Signal DSL', () => {
     })
   })
 
+  it('round-trips bounded per-voice effect sends', () => {
+    const result = parseComposition(`scene "Depth Map" {
+  voice bass: triangle send-fracture=0.2 send-veil=0.1 send-memory=0.65 send-environment=0.35
+}`)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.composition.voices.bass.sends).toEqual({ fracture: 0.2, veil: 0.1, memory: 0.65, environment: 0.35 })
+    const canonical = serializeComposition(result.composition)
+    expect(canonical).toContain('send-fracture=0.2 send-veil=0.1 send-memory=0.65 send-environment=0.35')
+    const roundTrip = parseComposition(canonical)
+    expect(roundTrip.ok && roundTrip.composition).toEqual(result.composition)
+  })
+
+  it('rejects out-of-range effect sends', () => {
+    const result = parseComposition('scene "Unsafe Send" {\n  voice texture: sawtooth send-memory=1.1\n}')
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.error.message).toContain('memory send can range from 0 to 1')
+  })
+
   it('rejects an engine that is incompatible with its voice role', () => {
     const result = parseComposition('scene "Wrong Engine" {\n  voice pulse: sine engine=fm\n}')
     expect(result.ok).toBe(false)

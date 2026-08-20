@@ -3,14 +3,24 @@ import { clamp, meterParts, stepsPerBeat, type ApplyQuantization, type Compositi
 import { occurrenceAllowsVoice, occurrenceLayerSelection, resolveArrangementOccurrence, transposeOccurrenceNote, transposeOccurrenceNotes } from '../model/arrangement'
 import { mapOverclock } from './overclock'
 import { advanceFatigue, resolveSequencerStep } from './sequencing'
-import { delayFeedback, delayWet, INPUT_GAIN, LIMITER_CEILING_DB, masterOutputDb, reverbWet } from './signalPath'
-import { mapFracture, mapVeil } from './soundverse'
+import { LIMITER_CEILING_DB, masterOutputDb } from './signalPath'
 import { LayeredVoiceSource } from './instrumentSource'
 import { resolvePitchedLifecycle } from './legato'
+import {
+  automateParallelEffectRouting,
+  createParallelEffectRouting,
+  createVoiceSendRoute,
+  disposeParallelEffectRouting,
+  disposeVoiceSendRoute,
+  updateParallelEffectRouting,
+  updateVoiceSendRoute,
+  type ParallelEffectRouting,
+  type VoiceSendRoute,
+} from './effectRouting'
 
 type Boundary = ApplyQuantization
 interface PerformanceState { pressure: boolean; freeze: boolean }
-interface VoiceChannel { filter: Tone.Filter; volume: Tone.Volume }
+interface VoiceChannel { filter: Tone.Filter; volume: Tone.Volume; route: VoiceSendRoute }
 
 export interface AudioEngineCallbacks {
   getComposition: () => Composition
@@ -23,13 +33,7 @@ export interface AudioEngineCallbacks {
 export class VioletAudioEngine {
   private sources: Partial<Record<VoiceId, LayeredVoiceSource>> = {}
   private channels: Partial<Record<VoiceId, VoiceChannel>> = {}
-  private input: Tone.Gain | null = null
-  private drive: Tone.Distortion | null = null
-  private crusher: Tone.BitCrusher | null = null
-  private chorus: Tone.Chorus | null = null
-  private delay: Tone.FeedbackDelay | null = null
-  private reverb: Tone.Reverb | null = null
-  private output: Tone.Volume | null = null
+  private routing: ParallelEffectRouting | null = null
   private limiter: Tone.Limiter | null = null
   private recorder: Tone.Recorder | null = null
   private scheduleId: number | null = null
@@ -54,34 +58,19 @@ export class VioletAudioEngine {
     const settings = composition.voices[id]
     const filter = new Tone.Filter({ type: settings.filterType, frequency: settings.cutoff, rolloff: -24, Q: settings.resonance })
     const volume = new Tone.Volume(settings.volume)
-    filter.chain(volume, this.input!)
-    return { filter, volume }
+    filter.connect(volume)
+    const route = createVoiceSendRoute(volume, this.routing!, settings.sends)
+    return { filter, volume, route }
   }
 
   async initialize(composition: Composition): Promise<void> {
     await Tone.start()
     if (this.initialized) return
-    this.input = new Tone.Gain(INPUT_GAIN)
-    this.drive = new Tone.Distortion({ distortion: 0, oversample: '2x' })
-    const fracture = mapFracture(composition.sound.fracture)
-    const veil = mapVeil(composition.sound.veil)
-    this.crusher = new Tone.BitCrusher(fracture.bits)
-    this.crusher.wet.value = fracture.wet
-    this.chorus = new Tone.Chorus({
-      frequency: veil.frequency,
-      delayTime: veil.delayTime,
-      depth: veil.depth,
-      spread: 180,
-      wet: veil.wet,
-    }).start()
-    this.delay = new Tone.FeedbackDelay({ delayTime: '8n.', feedback: delayFeedback(composition.sound.memory), wet: delayWet(composition.sound.memory) })
-    this.reverb = new Tone.Reverb({ decay: 3.2, preDelay: 0.035, wet: reverbWet(composition.sound.environment) })
-    this.output = new Tone.Volume(composition.masterVolume)
     this.limiter = new Tone.Limiter(LIMITER_CEILING_DB).toDestination()
     this.recorder = new Tone.Recorder()
-    this.input.chain(this.drive, this.crusher, this.chorus, this.delay, this.reverb, this.output, this.limiter)
+    this.routing = createParallelEffectRouting(composition.sound, 0, composition.masterVolume, Tone.Time('8n.').toSeconds(), this.limiter)
     this.limiter.connect(this.recorder)
-    await this.reverb.ready
+    await this.routing.reverb.ready
 
     for (const id of ['chords', 'bass', 'pulse', 'texture'] as VoiceId[]) this.channels[id] = this.makeChannel(composition, id)
     for (const id of ['chords', 'bass', 'pulse', 'texture'] as VoiceId[]) {
@@ -103,24 +92,10 @@ export class VioletAudioEngine {
       this.exhaustion = 0
     }
     const mapped = mapOverclock(composition.sound.overclock + (this.callbacks.getPerformance().pressure ? 0.28 : 0), this.exhaustion)
-    const fracture = mapFracture(composition.sound.fracture)
-    const veil = mapVeil(composition.sound.veil)
     const transport = Tone.getTransport()
     transport.timeSignature = meterParts(composition.meter)
     Tone.getTransport().bpm.rampTo(composition.bpm, 0.08)
-    if (this.drive) this.drive.distortion = mapped.drive
-    this.crusher?.wet.rampTo(fracture.wet, 0.1)
-    this.crusher?.bits.rampTo(fracture.bits, 0.1)
-    if (this.chorus) {
-      this.chorus.wet.rampTo(veil.wet, 0.12)
-      this.chorus.frequency.rampTo(veil.frequency, 0.12)
-      this.chorus.depth = veil.depth
-      this.chorus.delayTime = veil.delayTime
-    }
-    this.delay?.wet.rampTo(delayWet(composition.sound.memory), 0.1)
-    this.delay?.feedback.rampTo(this.callbacks.getPerformance().freeze ? 0.82 : delayFeedback(composition.sound.memory), 0.1)
-    this.reverb?.wet.rampTo(reverbWet(composition.sound.environment), 0.15)
-    this.output?.volume.rampTo(masterOutputDb(composition.masterVolume, mapped.outputTrimDb), 0.08)
+    if (this.routing) updateParallelEffectRouting(this.routing, composition.sound, mapped.drive, masterOutputDb(composition.masterVolume, mapped.outputTrimDb), this.callbacks.getPerformance().freeze)
 
     const anySolo = Object.values(composition.voices).some((voice) => voice.solo)
     for (const id of ['chords', 'bass', 'pulse', 'texture'] as VoiceId[]) {
@@ -132,6 +107,7 @@ export class VioletAudioEngine {
       channel.filter.type = voice.filterType
       channel.filter.Q.rampTo(voice.resonance, 0.06)
       channel.filter.frequency.rampTo(clamp(voice.cutoff * (id === 'chords' ? mapped.brightness : 1), 80, 12000), 0.06)
+      updateVoiceSendRoute(channel.route, voice.sends)
     }
     for (const id of ['chords', 'bass', 'pulse', 'texture'] as VoiceId[]) {
       this.sources[id]?.update(composition.voices[id], id === 'chords'
@@ -153,14 +129,8 @@ export class VioletAudioEngine {
     const performance = this.callbacks.getPerformance()
     const stepDuration = Tone.Time('16n').toSeconds()
     const resolved = resolveSequencerStep(composition, pattern, this.step, this.cycle, this.exhaustion, performance.pressure, stepDuration, occurrence)
-    const veil = mapVeil(resolved.veil)
-    const fracture = mapFracture(resolved.fracture)
     this.channels.chords?.filter.frequency.rampTo(clamp(resolved.mask * resolved.mapped.brightness, 80, 12000), 0.03)
-    this.delay?.wet.rampTo(delayWet(resolved.memory), 0.04)
-    this.delay?.feedback.rampTo(performance.freeze ? 0.82 : delayFeedback(resolved.memory), 0.04)
-    this.chorus?.wet.rampTo(veil.wet, 0.04)
-    this.crusher?.wet.rampTo(fracture.wet, 0.04)
-    this.crusher?.bits.rampTo(fracture.bits, 0.04)
+    if (this.routing) automateParallelEffectRouting(this.routing, resolved.memory, resolved.veil, resolved.fracture, performance.freeze)
 
     const jitteredTime = time + resolved.timingOffset
     const ratchetSpacing = stepDuration / resolved.ratchets
@@ -269,9 +239,11 @@ export class VioletAudioEngine {
     this.scheduleId = null
     for (const source of Object.values(this.sources)) source.dispose()
     this.sources = {}
-    for (const channel of Object.values(this.channels)) { channel.filter.dispose(); channel.volume.dispose() }
+    for (const channel of Object.values(this.channels)) { disposeVoiceSendRoute(channel.route); channel.filter.dispose(); channel.volume.dispose() }
     this.channels = {}
-    this.input?.dispose(); this.drive?.dispose(); this.crusher?.dispose(); this.chorus?.dispose(); this.delay?.dispose(); this.reverb?.dispose(); this.output?.dispose(); this.limiter?.dispose(); this.recorder?.dispose()
+    if (this.routing) disposeParallelEffectRouting(this.routing)
+    this.routing = null
+    this.limiter?.dispose(); this.recorder?.dispose()
     this.initialized = false
   }
 }

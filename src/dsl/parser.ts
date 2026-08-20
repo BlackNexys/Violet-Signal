@@ -178,7 +178,7 @@ function parseVoice(value: string, role: VoiceId, voice: VoiceSettings, line: nu
   if (!waveform || !WAVEFORMS.includes(waveform as Waveform)) fail(`Voice starts with ${WAVEFORMS.join(', ')}.`, line, excerpt)
   voice.layers.primary.waveform = waveform as Waveform
   for (const token of tokens) {
-    const match = /^(volume|cutoff|attack|decay|sustain|release|filter|resonance|detune|glide|mute|solo|engine|octave|character|layer-level|attack-scale|release-scale)=(.+)$/.exec(token)
+    const match = /^(volume|cutoff|attack|decay|sustain|release|filter|resonance|detune|glide|mute|solo|engine|octave|character|layer-level|attack-scale|release-scale|send-fracture|send-veil|send-memory|send-environment)=(.+)$/.exec(token)
     if (!match) fail(`“${token}” is not a voice setting.`, line, excerpt)
     const [, key, raw] = match
     if (key === 'volume') voice.volume = numberIn(raw, 'Voice volume', -36, -4, line, excerpt)
@@ -203,6 +203,10 @@ function parseVoice(value: string, role: VoiceId, voice: VoiceSettings, line: nu
     if (key === 'layer-level') voice.layers.primary.level = numberIn(raw, 'Layer level', -36, 0, line, excerpt)
     if (key === 'attack-scale') voice.layers.primary.attackScale = numberIn(raw, 'Attack scale', 0.25, 4, line, excerpt)
     if (key === 'release-scale') voice.layers.primary.releaseScale = numberIn(raw, 'Release scale', 0.25, 4, line, excerpt)
+    if (key.startsWith('send-')) {
+      const target = key.slice(5) as keyof VoiceSettings['sends']
+      voice.sends[target] = numberIn(raw, `${target} send`, 0, 1, line, excerpt)
+    }
     if (key === 'glide') voice.glide = numberIn(raw, 'Glide', 0, 0.5, line, excerpt)
     if (key === 'mute') voice.mute = onOff(raw, 'Mute', line, excerpt)
     if (key === 'solo') voice.solo = onOff(raw, 'Solo', line, excerpt)

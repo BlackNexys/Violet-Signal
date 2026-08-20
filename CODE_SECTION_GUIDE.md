@@ -109,7 +109,7 @@ There are four voices: `chords`, `bass`, `pulse`, and `texture`. Each has a requ
 
 ```text
 patch chords: veil-archive/glass-choir@1
-voice chords: triangle engine=am octave=0 detune=0 layer-level=-2 character=0.42 attack-scale=1.15 release-scale=1.2 filter=lowpass cutoff=2450 resonance=1.1 glide=0 volume=-13 attack=0.34 decay=0.86 sustain=0.68 release=3.4 mute=off solo=off
+voice chords: triangle engine=am octave=0 detune=0 layer-level=-2 character=0.42 attack-scale=1.15 release-scale=1.2 filter=lowpass cutoff=2450 resonance=1.1 glide=0 volume=-13 attack=0.34 decay=0.86 sustain=0.68 release=3.4 send-fracture=0.18 send-veil=0.78 send-memory=0.52 send-environment=0.86 mute=off solo=off
 layer chords shadow: on engine=fm waveform=sine octave=1 detune=7 level=-17 character=0.5 attack-scale=1.65 release-scale=1.35
 ```
 
@@ -133,10 +133,13 @@ layer chords shadow: on engine=fm waveform=sine octave=1 detune=7 level=-17 char
 | `decay` | `0.02`–`3` | Time from the attack peak to sustain. |
 | `sustain` | `0`–`1` | Held amplitude. |
 | `release` | `0.03`–`5` | Fade-out time after release. |
+| `send-fracture` / `send-veil` / `send-memory` / `send-environment` | `0`–`1` | Amount of the complete filtered voice sent to each shared effect return. |
 | `mute` | `on` or `off` | Silences this voice. |
 | `solo` | `on` or `off` | Silences every voice that is not soloed. |
 
-Shadow syntax starts with `on` or `off`, followed by `engine`, `waveform`, `octave`, `detune`, `level`, `character`, `attack-scale`, and `release-scale`. Canonical formatting writes every field even when Shadow is off.
+Shadow syntax starts with `on` or `off`, followed by `engine`, `waveform`, `octave`, `detune`, `level`, `character`, `attack-scale`, and `release-scale`. Canonical formatting writes every field even when Shadow is off. Sends belong to the complete voice after Primary and Shadow have passed through their shared filter and level; there are no separate per-layer sends.
+
+Legacy voice lines without send fields remain valid and normalize each send to `1`. Choosing a Sound patch preserves the current sends because patches change the instrument itself, not its placement. Manual send edits likewise preserve patch provenance.
 
 Long attacks can make a correctly timed note feel late. For sharp pulse or bass events, keep attack near `0.005`–`0.03`. Longer chord and texture attacks are useful for pads.
 
@@ -163,7 +166,7 @@ output: -12
 | `humanize` | `0`–`0.2` | Deterministic timing variation. The first step remains locked to the loop grid. |
 | `overclock` | `0`–`1` | Combined brightness, drive, activity, and instability. Sustained extremes trigger recovery. |
 
-For controlled results, change one of these controls at a time. High Memory or Environment can make one bar overlap the next; that is an effect tail, not a transport delay.
+These values shape each shared processor and its return strength; the four `send-*` values on a voice determine how much of that voice enters it. For controlled results, change one control at a time. High Memory or Environment can make one bar overlap the next; that is an effect tail, not a transport delay.
 
 ## Writing notes and chords
 
@@ -402,6 +405,7 @@ layers        = VOICE:(all | primary | shadow), joined by +
 effects       = EFFECT_TARGET:number, joined by +
 EFFECT_TARGET = mask | memory | veil | fracture | ghost | overclock
 effect_modifier = mask:0.25..4 | (memory | veil | fracture | ghost | overclock):-1..1
+voice_send     = send-(fracture | veil | memory | environment)=number(0..1)
 waveform      = sine | triangle | square | sawtooth
 filter_type   = lowpass | bandpass | highpass
 resonance     = number 0..12

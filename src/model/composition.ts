@@ -5,6 +5,7 @@ export const STEP_COUNT_OPTIONS = [8, 12, 14, 16, 20, 24, 28, 32, 64] as const
 export const METERS = ['4/4', '3/4', '6/8', '5/4', '7/8'] as const
 export const PATTERN_IDS = ['A', 'B', 'C', 'D'] as const
 export const VOICE_IDS = ['chords', 'bass', 'pulse', 'texture'] as const
+export const EFFECT_SEND_TARGETS = ['fracture', 'veil', 'memory', 'environment'] as const
 export const SCALE_ROOTS = ['C', 'C#', 'Db', 'D', 'D#', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'G#', 'Ab', 'A', 'A#', 'Bb', 'B'] as const
 export const SCALE_MODES = ['minor', 'major', 'dorian', 'phrygian', 'harmonic minor', 'melodic minor', 'pentatonic'] as const
 export const FORMAT_VERSION = 3
@@ -18,6 +19,7 @@ export type StyleId = string
 export type SoundWorld = StyleId
 export type Meter = (typeof METERS)[number]
 export type VoiceId = (typeof VOICE_IDS)[number]
+export type EffectSendTarget = (typeof EFFECT_SEND_TARGETS)[number]
 export type LayerSlot = 'primary' | 'shadow'
 export type ArrangementLayerSelection = 'all' | LayerSlot
 export type InstrumentEngine = 'subtractive' | 'fm' | 'am' | 'dual' | 'pluck' | 'membrane' | 'metal' | 'noise'
@@ -77,6 +79,7 @@ export interface VoiceSettings {
   resonance: number
   glide: number
   volume: number
+  sends: Record<EffectSendTarget, number>
   mute: boolean
   solo: boolean
 }
@@ -201,14 +204,22 @@ export const ENGINES_BY_VOICE: Record<VoiceId, InstrumentEngine[]> = {
   texture: ['metal', 'noise'],
 }
 
-export interface VoiceRecipe extends Partial<Omit<VoiceSettings, 'patchId' | 'layers'>> {
+export interface VoiceRecipe extends Partial<Omit<VoiceSettings, 'patchId' | 'layers' | 'sends'>> {
   patchId?: string | null
   core?: Waveform
   detune?: number
   engine?: InstrumentEngine
   primary?: Partial<VoiceLayerSettings>
   shadow?: Partial<VoiceLayerSettings>
+  sends?: Partial<Record<EffectSendTarget, number>>
 }
+
+export const makeEffectSends = (): Record<EffectSendTarget, number> => ({
+  fracture: 1,
+  veil: 1,
+  memory: 1,
+  environment: 1,
+})
 
 export function isEngineCompatible(voice: VoiceId, engine: InstrumentEngine): boolean {
   return ENGINES_BY_VOICE[voice].includes(engine)
@@ -245,6 +256,7 @@ export function makeVoiceSettings(voice: VoiceId, overrides: VoiceRecipe = {}): 
     resonance: 0.7,
     glide: 0,
     volume: -10,
+    sends: makeEffectSends(),
     mute: false,
     solo: false,
   }
@@ -258,9 +270,10 @@ export function applyVoiceRecipe(settings: VoiceSettings, recipe: VoiceRecipe, v
       primary: { ...settings.layers.primary },
       shadow: { ...settings.layers.shadow },
     },
+    sends: { ...settings.sends },
   }
   for (const [key, value] of Object.entries(recipe)) {
-    if (value === undefined || ['core', 'detune', 'engine', 'primary', 'shadow'].includes(key)) continue
+    if (value === undefined || ['core', 'detune', 'engine', 'primary', 'shadow', 'sends'].includes(key)) continue
     ;(next as unknown as Record<string, unknown>)[key] = value
   }
   if (recipe.core !== undefined) next.layers.primary.waveform = recipe.core
@@ -268,6 +281,11 @@ export function applyVoiceRecipe(settings: VoiceSettings, recipe: VoiceRecipe, v
   if (recipe.engine !== undefined && isEngineCompatible(voice, recipe.engine)) next.layers.primary.engine = recipe.engine
   if (recipe.primary) next.layers.primary = { ...next.layers.primary, ...recipe.primary, enabled: true }
   if (recipe.shadow) next.layers.shadow = { ...next.layers.shadow, ...recipe.shadow }
+  if (recipe.sends) {
+    for (const target of EFFECT_SEND_TARGETS) {
+      if (recipe.sends[target] !== undefined) next.sends[target] = clamp(recipe.sends[target], 0, 1)
+    }
+  }
   return next
 }
 
@@ -485,10 +503,12 @@ function normalizeVoice(id: VoiceId, input: VoiceSettings | undefined): VoiceSet
   delete channel.detune
   delete channel.layers
   delete channel.patchId
+  delete channel.sends
   return {
     ...defaults,
     ...channel,
     patchId: legacy.patchId ?? null,
+    sends: Object.fromEntries(EFFECT_SEND_TARGETS.map((target) => [target, clamp(legacy.sends?.[target] ?? 1, 0, 1)])) as Record<EffectSendTarget, number>,
     layers: {
       primary: normalizeLayer(id, 'primary', primary),
       shadow: normalizeLayer(id, 'shadow', shadow),

@@ -4,10 +4,10 @@ import { occurrenceAllowsVoice, occurrenceLayerSelection, resolveArrangementOccu
 import { measurePeak, peakNormalizationGain } from './normalization'
 import { mapOverclock } from './overclock'
 import { advanceFatigue, resolveSequencerStep, type FatigueState } from './sequencing'
-import { delayFeedback, delayWet, INPUT_GAIN, LIMITER_CEILING_DB, masterOutputDb, reverbWet } from './signalPath'
-import { mapFracture, mapVeil } from './soundverse'
+import { LIMITER_CEILING_DB, masterOutputDb } from './signalPath'
 import { LayeredVoiceSource } from './instrumentSource'
 import { resolvePitchedLifecycle } from './legato'
+import { createParallelEffectRouting, createVoiceSendRoute, setParallelEffectRoutingAtTime } from './effectRouting'
 
 function encodeWav(buffer: AudioBuffer, gain: number): Blob {
   const channels = Math.min(2, buffer.numberOfChannels)
@@ -49,32 +49,27 @@ export async function renderCompositionToWav(composition: Composition): Promise<
   const rendered = await Tone.Offline(async () => {
     const mapped = mapOverclock(composition.sound.overclock)
     const limiter = new Tone.Limiter(LIMITER_CEILING_DB).toDestination()
-    const master = new Tone.Volume(masterOutputDb(composition.masterVolume, mapped.outputTrimDb)).connect(limiter)
-    const reverb = new Tone.Reverb({ decay: 3.2, preDelay: 0.035, wet: reverbWet(composition.sound.environment) }).connect(master)
-    const delay = new Tone.FeedbackDelay({ delayTime: secondsPerStep * 3, feedback: delayFeedback(composition.sound.memory), wet: delayWet(composition.sound.memory) }).connect(reverb)
-    const veil = mapVeil(composition.sound.veil)
-    const fracture = mapFracture(composition.sound.fracture)
-    const chorus = new Tone.Chorus({ frequency: veil.frequency, delayTime: veil.delayTime, depth: veil.depth, spread: 180, wet: veil.wet }).start().connect(delay)
-    const crusher = new Tone.BitCrusher(fracture.bits).connect(chorus)
-    crusher.wet.value = fracture.wet
-    const drive = new Tone.Distortion({ distortion: mapped.drive, oversample: '2x' }).connect(crusher)
-    const input = new Tone.Gain(INPUT_GAIN).connect(drive)
-    await reverb.ready
+    const routing = createParallelEffectRouting(composition.sound, mapped.drive, masterOutputDb(composition.masterVolume, mapped.outputTrimDb), secondsPerStep * 3, limiter)
+    await routing.reverb.ready
     const chordVoice = composition.voices.chords
-    const chordVolume = new Tone.Volume(chordVoice.volume).connect(input)
+    const chordVolume = new Tone.Volume(chordVoice.volume)
     const chordFilter = new Tone.Filter({ frequency: chordVoice.cutoff, type: chordVoice.filterType, rolloff: -24, Q: chordVoice.resonance }).connect(chordVolume)
+    createVoiceSendRoute(chordVolume, routing, chordVoice.sends)
     const chords = new LayeredVoiceSource('chords', chordFilter, chordVoice, { envelopeScale: mapped.envelopeScale, pitchDriftCents: mapped.pitchDriftCents })
     const bassVoice = composition.voices.bass
-    const bassVolume = new Tone.Volume(bassVoice.volume).connect(input)
+    const bassVolume = new Tone.Volume(bassVoice.volume)
     const bassFilter = new Tone.Filter({ frequency: bassVoice.cutoff, type: bassVoice.filterType, rolloff: -24, Q: bassVoice.resonance }).connect(bassVolume)
+    createVoiceSendRoute(bassVolume, routing, bassVoice.sends)
     const bass = new LayeredVoiceSource('bass', bassFilter, bassVoice)
     const pulseVoice = composition.voices.pulse
-    const pulseVolume = new Tone.Volume(pulseVoice.volume).connect(input)
+    const pulseVolume = new Tone.Volume(pulseVoice.volume)
     const pulseFilter = new Tone.Filter({ frequency: pulseVoice.cutoff, type: pulseVoice.filterType, rolloff: -24, Q: pulseVoice.resonance }).connect(pulseVolume)
+    createVoiceSendRoute(pulseVolume, routing, pulseVoice.sends)
     const pulse = new LayeredVoiceSource('pulse', pulseFilter, pulseVoice)
     const textureVoice = composition.voices.texture
-    const textureVolume = new Tone.Volume(textureVoice.volume).connect(input)
+    const textureVolume = new Tone.Volume(textureVoice.volume)
     const textureFilter = new Tone.Filter({ frequency: textureVoice.cutoff, type: textureVoice.filterType, rolloff: -24, Q: textureVoice.resonance }).connect(textureVolume)
+    createVoiceSendRoute(textureVolume, routing, textureVoice.sends)
     const texture = new LayeredVoiceSource('texture', textureFilter, textureVoice)
 
     let lastChord = ['C4', 'Eb4', 'G4']
@@ -89,17 +84,11 @@ export async function renderCompositionToWav(composition: Composition): Promise<
       pattern.steps.forEach((step, index) => {
         const time = (stepCursor + index) * secondsPerStep
         const resolved = resolveSequencerStep(composition, pattern, index, bar, fatigue.exhaustion, false, secondsPerStep, occurrence)
-        const automatedVeil = mapVeil(resolved.veil)
-        const automatedFracture = mapFracture(resolved.fracture)
         const eventTime = time + resolved.timingOffset
         const ratchetSpacing = secondsPerStep / resolved.ratchets
         const triggerTimes = Array.from({ length: resolved.ratchets }, (_, ratchet) => eventTime + ratchet * ratchetSpacing)
         chordFilter.frequency.setValueAtTime(clamp(resolved.mask * resolved.mapped.brightness, 80, 12000), time)
-        delay.wet.setValueAtTime(delayWet(resolved.memory), time)
-        delay.feedback.setValueAtTime(delayFeedback(resolved.memory), time)
-        chorus.wet.setValueAtTime(automatedVeil.wet, time)
-        crusher.wet.setValueAtTime(automatedFracture.wet, time)
-        crusher.bits.setValueAtTime(automatedFracture.bits, time)
+        setParallelEffectRoutingAtTime(routing, resolved.memory, resolved.veil, resolved.fracture, time)
         const chordAllowed = occurrenceAllowsVoice(composition, occurrence, 'chords')
         const chordCanSound = step.notes.length > 0 && resolved.shouldPlay && chordAllowed
         if (chordReleasePending) chords.release(chordCanSound ? eventTime : time)

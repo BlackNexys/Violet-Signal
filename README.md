@@ -90,7 +90,7 @@ The sequencer groups cells according to the selected meter. `/4` beats read `1 e
 
 Four independent patterns can be appended to an arrangement of up to sixteen occurrences. Select an occurrence to transpose its pitched events, rotate its complete step memory and automation, mute voices for that repetition, focus each voice on all enabled layers, Primary only, or Shadow only, and add bounded effect modifiers. The source pattern remains unchanged, and the transport shows both the sounding pattern and current occurrence. The model and precedence rules are documented in [`project-notes/arrangement-occurrences.md`](project-notes/arrangement-occurrences.md).
 
-Chord, Bass, Pulse, and Texture voices each have Primary and optional Shadow layers plus a shared selectable filter, ADSR envelope, level, mute, and solo settings. Every source is synthesized or procedurally generated; no remote samples are used.
+Chord, Bass, Pulse, and Texture voices each have Primary and optional Shadow layers plus a shared selectable filter, ADSR envelope, level, mute, and solo settings. The selected voice's **Depth** controls independently send that complete voice to the shared Fracture, Veil, Memory, and Environment returns. Every source is synthesized or procedurally generated; no remote samples are used.
 
 ### Add motion and perform
 
@@ -128,8 +128,8 @@ scene "Rain Behind Glass" {
   patterns: A B C D
   active: A
   arrangement: A A[transpose=12,rotate=-3,effects=memory:0.25] B[mute=pulse] C[layers=chords:shadow]
-  voice chords: triangle volume=-10 cutoff=2550 attack=0.12 decay=0.62 sustain=0.64 release=2.2 mute=off solo=off
-  voice bass: triangle volume=-9 cutoff=950 attack=0.012 decay=0.3 sustain=0.5 release=0.7 mute=off solo=off
+  voice chords: triangle volume=-10 cutoff=2550 attack=0.12 decay=0.62 sustain=0.64 release=2.2 send-fracture=0.2 send-veil=0.8 send-memory=0.6 send-environment=0.9 mute=off solo=off
+  voice bass: triangle volume=-9 cutoff=950 attack=0.012 decay=0.3 sustain=0.5 release=0.7 send-fracture=0.55 send-veil=0.1 send-memory=0.2 send-environment=0.25 mute=off solo=off
   memory: 0.42
   environment: 0.34
   veil: 0.56
@@ -164,7 +164,7 @@ The CodeMirror editor provides syntax coloring, suggestions, formatting, error-l
 - `src/persistence/` — IndexedDB project and automatic-recovery storage.
 - `src/components/` — instrument, step editor, arrangement, automation, code editor, project tools, and transport UI.
 
-The audio graph is created only after a user gesture. A shared source factory builds each voice's Primary and Shadow sources for both live and offline contexts. Four voice-specific filter/volume channels feed shared drive, parallel bit reduction, stereo chorus, delay, generated reverb, master compensation, and a hard −1 dB limiter. Parameter changes ramp where Tone exposes signal parameters. One transport callback schedules all four voices, applies automation and seeded variations, advances arrangements, and commits queued code at musical boundaries. Scheduled events and nodes are cleared and disposed on unmount.
+The audio graph is created only after a user gesture. A shared source factory builds each voice's Primary and Shadow sources for both live and offline contexts. After its filter and level, each voice forks to a trimmed dry bus and four bounded sends feeding shared bit-reduction, stereo-chorus, delay, and generated-reverb processors in parallel. Their returns recombine before shared drive, master compensation, and a hard −1 dB limiter. Parameter changes ramp where Tone exposes signal parameters. One transport callback schedules all four voices, applies automation and seeded variations, advances arrangements, and commits queued code at musical boundaries. Scheduled events and nodes are cleared and disposed on unmount.
 
 ## Protections
 
@@ -181,11 +181,12 @@ The audio graph is created only after a user gesture. A shared source factory bu
 
 - The musical architecture intentionally remains four voices, four editable patterns, and sixteen arrangement phrases; patterns can contain 8–64 steps.
 - Chord ties sustain common pitches and exchange changed voices; physical-pluck sources must re-excite changed pitches because their delay line cannot be continuously repitched. Mono subtractive, FM, AM, and dual Bass ties use their pitch-change and Glide path.
-- Offline WAV rendering includes deterministic Ghost/Humanize variation, step automation, and the shared effects graph. Temporary Pressure and Freeze Memory gestures require live capture.
+- Offline WAV rendering includes deterministic Ghost/Humanize variation, step automation, and the shared parallel-effects graph. Temporary Pressure and Freeze Memory gestures require live capture.
+- Effect sends belong to a complete voice after its Primary/Shadow mix; separate per-layer processors and sends are intentionally not included.
 - Live recording format depends on the browser and is currently downloaded as WebM.
 - Projects are local to the browser profile; there are no accounts or cloud collaboration.
 - MIDI input, stem export, audio-file upload, and full loudness mastering are not included; WAV export performs transparent peak normalization only.
 
 ## Next valuable milestone
 
-Refactor the serial effect chain into shared parallel returns and expose bounded per-voice Fracture, Veil, Memory, and Environment sends with live/offline parity. The adopted sequence is maintained in [`notes/instrument-sound-and-layer-expansion-plan.md`](notes/instrument-sound-and-layer-expansion-plan.md).
+Use composition feedback from the completed sound, arrangement, automation, tie, and routing milestones to decide between an optional fifth melodic Signal voice and completing the remaining Fractured Relay / Low Cinema patch content. The adopted sequence is maintained in [`notes/instrument-sound-and-layer-expansion-plan.md`](notes/instrument-sound-and-layer-expansion-plan.md).

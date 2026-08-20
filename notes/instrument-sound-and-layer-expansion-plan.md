@@ -1,6 +1,6 @@
 # Instrument Sound and Layer Expansion Plan
 
-Status: in progress — true ties and legato source lifecycles completed
+Status: in progress — 9 of 10 delivery steps completed; per-voice effect sends shipped
 Date: 2026-08-19  
 Last planning update: 2026-08-20
 Last implementation update: 2026-08-20
@@ -15,7 +15,7 @@ The first vertical slice is implemented:
 - Patch selection, editable layer controls, Custom provenance, undo/redo, and queued playback-boundary application.
 - Safe notation, CodeMirror support, IndexedDB/project normalization, documentation, and production-browser layered WAV coverage.
 
-The headless CLI is implemented with validation, formatting, and production-path WAV rendering. Format v3 arrangement occurrences provide transpose, whole-memory rotation, per-voice mute, Primary/Shadow selection, and bounded effect modifiers. Dorian, Phrygian, harmonic minor, melodic minor, and pentatonic share one interval registry across notation, keyboard choices, and chord suggestions. Dual and metal sources plus a bounded managed pluck pool run through the shared live/offline adapter; Chrome Wound and the first Fractured Relay patches exercise them in production-browser WAV coverage. Hold/Linear automation shares one circular resolver across lane previews, live playback, offline WAV rendering, and occurrence effects. Explicit Chord/Bass ties now use shared attack, pitch-change, and release lifecycles across live and offline rendering. Per-voice effect sends are next.
+The headless CLI is implemented with validation, formatting, and production-path WAV rendering. Format v3 arrangement occurrences provide transpose, whole-memory rotation, per-voice mute, Primary/Shadow selection, and bounded effect modifiers. Dorian, Phrygian, harmonic minor, melodic minor, and pentatonic share one interval registry across notation, keyboard choices, and chord suggestions. Dual and metal sources plus a bounded managed pluck pool run through the shared live/offline adapter; Chrome Wound and the first Fractured Relay patches exercise them in production-browser WAV coverage. Hold/Linear automation shares one circular resolver across lane previews, live playback, offline WAV rendering, and occurrence effects. Explicit Chord/Bass ties use shared attack, pitch-change, and release lifecycles across live and offline rendering. Per-voice Fracture, Veil, Memory, and Environment sends now feed a shared parallel graph built by the same live/offline routing factory. The remaining roadmap step is the product checkpoint for an optional Signal voice.
 
 ## Post-v2 feedback roadmap
 
@@ -195,7 +195,9 @@ Real ties use `>` as an explicit outgoing connection and source adapters expose 
 
 ## Milestone F — Per-voice effect sends
 
-The current graph routes all voices through one serial chain. True sends therefore require a topology refactor:
+Status: completed 2026-08-20.
+
+The implemented graph forks each complete filtered voice into a trimmed dry bus and four bounded sends:
 
 ```text
 voice channels -> dry bus ---------------------------------> output
@@ -205,9 +207,9 @@ voice channels -> dry bus ---------------------------------> output
               -> Environment --> shared Environment return-|
 ```
 
-Global effect controls continue to shape the shared processors; per-voice send values control how much Chord, Bass, Pulse, and Texture enter each processor. Start with migrated defaults chosen through listening comparisons. A parallel topology will not automatically reproduce the current serial interactions, so sonic compatibility needs explicit fixtures and, if necessary, a documented compatibility strategy.
+Global effect controls continue to shape the shared processors and returns; per-voice send values control how much Chord, Bass, Pulse, and Texture enter each processor. Missing legacy sends normalize to `1`, preserving the intent that every voice reaches every processor. A `0.78` dry trim, `0.72` send-input trim, existing input trim, and final limiter protect the parallel sum. Drive moved after the recombined returns, so this retains routing intent rather than attempting to reproduce every interaction from the former serial chain.
 
-Build the routing description once and instantiate it for both live and offline contexts. Validate gain staging, feedback safety, mute/solo, bypass, automation, tail duration, disposal, and deterministic WAV output before exposing all send controls in the UI.
+One routing factory now instantiates the graph for live playback and offline WAV rendering. The Instrument exposes the sends as the selected voice's **Depth** controls, canonical notation writes `send-fracture`, `send-veil`, `send-memory`, and `send-environment`, and sound-patch selection preserves these routing choices. Unit, production build, live browser, and offline-WAV coverage validate gain staging, feedback safety, mute/solo behavior, automation, disposal, and renderer parity.
 
 ## Deferred expansion — Optional Signal voice
 
@@ -225,7 +227,7 @@ Its design checkpoint must decide whether Signal receives its own pattern lane, 
 6. **Completed:** Add occurrence rotation and bounded effect modifiers.
 7. **Completed:** Add Hold/Linear automation interpolation.
 8. **Completed:** Add true ties and legato source lifecycles.
-9. Refactor the effect graph and expose per-voice sends.
+9. **Completed:** Refactor the effect graph and expose per-voice sends.
 10. Reassess the optional Signal voice using real composition feedback from the preceding features.
 
 ## Outcome
