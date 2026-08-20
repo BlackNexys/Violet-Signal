@@ -18,6 +18,7 @@ import {
   type FilterType,
   type InstrumentEngine,
   type Meter,
+  type OccurrenceEffectTarget,
   type VoiceId,
   type VoiceSettings,
   type VoiceLayerSettings,
@@ -60,7 +61,7 @@ function patternId(value: string, line: number, excerpt: string): PatternId {
 
 function parseArrangementOccurrence(value: string, line: number, excerpt: string): ArrangementOccurrence {
   const match = /^([a-d])(?:\[([^\]]+)\])?$/i.exec(value)
-  if (!match) fail(`“${value}” needs a pattern letter, optionally followed by [transpose=12,mute=pulse,layers=chords:shadow].`, line, excerpt)
+  if (!match) fail(`“${value}” needs a pattern letter, optionally followed by [transpose=12,rotate=-3,mute=pulse,layers=chords:shadow,effects=memory:0.25].`, line, excerpt)
   const occurrence = makeArrangementOccurrence(patternId(match[1].toUpperCase(), line, excerpt))
   if (!match[2]) return occurrence
 
@@ -76,6 +77,12 @@ function parseArrangementOccurrence(value: string, line: number, excerpt: string
       const transpose = numberIn(raw, 'Occurrence transpose', -24, 24, line, excerpt)
       if (!Number.isInteger(transpose)) fail('Occurrence transpose needs a whole number from -24 to 24.', line, excerpt)
       occurrence.transpose = transpose
+      continue
+    }
+    if (key === 'rotate') {
+      const rotate = numberIn(raw, 'Occurrence rotation', -63, 63, line, excerpt)
+      if (!Number.isInteger(rotate)) fail('Occurrence rotation needs a whole number from -63 to 63.', line, excerpt)
+      occurrence.rotate = rotate
       continue
     }
     if (key === 'mute') {
@@ -98,6 +105,22 @@ function parseArrangementOccurrence(value: string, line: number, excerpt: string
         if (configuredVoices.has(voice)) fail(`Occurrence layers configures “${voice}” more than once.`, line, excerpt)
         configuredVoices.add(voice)
         if (layer[2] !== 'all') occurrence.layers[voice] = layer[2] as 'primary' | 'shadow'
+      }
+      continue
+    }
+    if (key === 'effects') {
+      if (raw === 'none') continue
+      const configuredTargets = new Set<OccurrenceEffectTarget>()
+      for (const effectAssignment of raw.split('+')) {
+        const effect = /^(mask|memory|veil|fracture|ghost|overclock):(-?(?:\d+(?:\.\d*)?|\.\d+))$/.exec(effectAssignment)
+        if (!effect) fail('Occurrence effects use target:number entries joined by +.', line, excerpt)
+        const target = effect[1] as OccurrenceEffectTarget
+        if (configuredTargets.has(target)) fail(`Occurrence effects configures “${target}” more than once.`, line, excerpt)
+        configuredTargets.add(target)
+        const value = target === 'mask'
+          ? numberIn(effect[2], 'Occurrence mask multiplier', 0.25, 4, line, excerpt)
+          : numberIn(effect[2], `Occurrence ${target} offset`, -1, 1, line, excerpt)
+        if ((target === 'mask' && value !== 1) || (target !== 'mask' && value !== 0)) occurrence.effects[target] = value
       }
       continue
     }

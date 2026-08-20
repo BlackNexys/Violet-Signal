@@ -345,6 +345,8 @@ button:disabled { cursor: not-allowed; opacity: 0.35; }
 .occurrence-editor__layers { align-items: end; flex-wrap: wrap; }
 .occurrence-editor__layers label { display: grid; gap: 3px; color: var(--muted); font: 8px var(--font-data); text-transform: uppercase; letter-spacing: .06em; }
 .occurrence-editor__layers select { min-height: 28px; max-width: 125px; border: 1px solid #41354b; background: #100c15; color: var(--text); font: 9px var(--font-data); }
+.occurrence-editor__effect select, .occurrence-editor__effect button { min-height: 28px; border: 1px solid #41354b; border-radius: 2px; background: #100c15; color: var(--text); font: 9px var(--font-data); }
+.occurrence-editor__effect input { min-width: 120px; flex: 1; accent-color: var(--magenta); }
 .sequencer-scroll { overflow-x: auto; scrollbar-color: #5c4770 transparent; scrollbar-width: thin; padding: 5px 5px 15px; border: 1px solid rgba(40,33,50,.7); border-radius: 3px; background: linear-gradient(180deg, #09080d, #0d0b12); box-shadow: inset 0 1px rgba(255,255,255,.018); }
 .sequencer-grid { min-width: var(--grid-min-width, 686px); display: grid; grid-template-columns: 78px repeat(var(--step-count, 16), minmax(34px, 1fr)); gap: 4px; align-items: center; }
 .beat-ruler { min-width: 686px; display: grid; grid-template-columns: 78px repeat(4, 1fr); gap: 4px; padding-bottom: 4px; }
@@ -601,6 +603,7 @@ kbd { display: inline-block; min-width: 17px; padding: 1px 4px; border: 1px soli
   .occurrence-editor__layers label { grid-template-columns: 70px minmax(0, 1fr); align-items: center; }
   .occurrence-editor__layers select { max-width: none; width: 100%; min-height: 40px; }
   .occurrence-editor__buttons button { min-height: 40px; }
+  .occurrence-editor__effect select, .occurrence-editor__effect button { min-height: 40px; }
   .note-assignment { grid-template-columns: 1fr; }
   .chord-suggestions { overflow-x: auto; }
   .learning-backdrop { padding: 10px; }

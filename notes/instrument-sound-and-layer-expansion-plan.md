@@ -1,6 +1,6 @@
 # Instrument Sound and Layer Expansion Plan
 
-Status: in progress — scale and engine vocabulary completed
+Status: in progress — occurrence rotation and effect modifiers completed
 Date: 2026-08-19  
 Last planning update: 2026-08-20
 Last implementation update: 2026-08-20
@@ -15,7 +15,7 @@ The first vertical slice is implemented:
 - Patch selection, editable layer controls, Custom provenance, undo/redo, and queued playback-boundary application.
 - Safe notation, CodeMirror support, IndexedDB/project normalization, documentation, and production-browser layered WAV coverage.
 
-The headless CLI is implemented with validation, formatting, and production-path WAV rendering. Format v3 arrangement occurrences provide transpose, per-voice mute, and Primary/Shadow selection. Dorian, Phrygian, harmonic minor, melodic minor, and pentatonic now share one interval registry across notation, keyboard choices, and chord suggestions. Dual and metal sources plus a bounded managed pluck pool run through the shared live/offline adapter; Chrome Wound and the first Fractured Relay patches exercise them in production-browser WAV coverage. Whole-memory occurrence rotation and bounded effect modifiers are next.
+The headless CLI is implemented with validation, formatting, and production-path WAV rendering. Format v3 arrangement occurrences provide transpose, whole-memory rotation, per-voice mute, Primary/Shadow selection, and bounded effect modifiers. Dorian, Phrygian, harmonic minor, melodic minor, and pentatonic share one interval registry across notation, keyboard choices, and chord suggestions. Dual and metal sources plus a bounded managed pluck pool run through the shared live/offline adapter; Chrome Wound and the first Fractured Relay patches exercise them in production-browser WAV coverage. Hold/Linear automation interpolation is next.
 
 ## Post-v2 feedback roadmap
 
@@ -86,16 +86,20 @@ Replace `PatternId[]` as the persisted arrangement concept with explicit occurre
 interface ArrangementOccurrence {
   pattern: PatternId
   transpose: number
+  rotate: number
   mute: VoiceId[]
   layers: Partial<Record<VoiceId, 'all' | 'primary' | 'shadow'>>
+  effects: Partial<Record<AutomationTarget, number>>
 }
 ```
 
 Every field must have a neutral value so legacy entries migrate without audible change:
 
 - `transpose: 0`
+- `rotate: 0`
 - `mute: []`
 - missing layer selections mean `all`
+- missing effect modifiers mean no change
 
 ### Resolution semantics
 
@@ -113,8 +117,8 @@ Initial implementation scope:
 1. Transpose pitch-bearing Chord and Bass events by bounded semitones.
 2. Mute any voice for one occurrence without changing its pattern or global voice state.
 3. Select all, Primary-only, or Shadow-only output for a voice in one occurrence.
-4. Add rotation after its precise semantics are tested.
-5. Add effect modifiers only after their interaction with automation is represented by the shared resolver.
+4. Add rotation after its precise semantics are tested. **Completed.**
+5. Add effect modifiers only after their interaction with automation is represented by the shared resolver. **Completed.**
 
 Rotation should rotate the whole pattern memory, including its automation lanes. Splitting event rotation from automation rotation can be a later explicit feature; it must not happen accidentally. A rotated occurrence resolves virtual step indices and never rewrites the source pattern.
 
@@ -125,7 +129,7 @@ Effect transformations should be bounded modifiers rather than hidden replacemen
 Arrangement occurrences use format v3 and a compact inline form:
 
 ```text
-arrangement: A A[transpose=12] B[mute=pulse] C[rotate=2]
+arrangement: A A[transpose=12,rotate=-3] B[mute=pulse,effects=memory:0.25] C[layers=chords:shadow,effects=mask:1.5]
 ```
 
 The chosen grammar provides:
@@ -136,7 +140,7 @@ The chosen grammar provides:
 - canonical formatting;
 - room for layer selection and effect modifiers without making one line opaque.
 
-Neutral occurrences remain bare letters. Canonical formatting orders fields as transpose, mute, then layers, and orders voice lists as Chord, Bass, Pulse, Texture. Rotation and effect modifiers remain deliberately unsupported until their resolution semantics are implemented.
+Neutral occurrences remain bare letters. Canonical formatting orders fields as transpose, rotate, mute, layers, then effects; voice lists use Chord, Bass, Pulse, Texture order and effect lists use Mask, Memory, Veil, Fracture, Ghost, Overclock order. Rotation accepts `-63..63` whole steps. Mask is a `0.25..4` multiplier; the other effect values are `-1..1` offsets applied after pattern automation.
 
 Exit criteria:
 
@@ -159,7 +163,7 @@ Ship the occurrence model through a musically complete vertical slice:
 - live and offline parity;
 - deterministic tests covering loops, Ghost, Chance, ratchets, and Overclock.
 
-Add rotation and effect modifiers immediately afterward, once the shared resolution semantics are proven. This sequencing keeps the format extensible without making the first occurrence implementation depend on effect-graph work.
+The completed follow-on rotates steps, expressions, and automation as one virtual memory, then applies bounded effect modifiers through the shared live/offline sequencer resolver without mutating the source pattern.
 
 ## Milestone D — Scale and engine vocabulary
 
@@ -216,7 +220,7 @@ Its design checkpoint must decide whether Signal receives its own pattern lane, 
 3. **Completed:** Ship transpose, occurrence mute, and Primary/Shadow selection end to end.
 4. **Completed:** Add headless-browser `violet render` and verify the packaged WAV path.
 5. **Completed:** Add scale modes and complete dual, metal, and pluck profiling and patches.
-6. Add occurrence rotation and bounded effect modifiers.
+6. **Completed:** Add occurrence rotation and bounded effect modifiers.
 7. Add Hold/Linear automation interpolation.
 8. Add true ties and legato source lifecycles.
 9. Refactor the effect graph and expose per-voice sends.

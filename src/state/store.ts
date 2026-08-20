@@ -21,6 +21,7 @@ import {
   type AutomationTarget,
   type Composition,
   type NoteLane,
+  type OccurrenceEffectTarget,
   type PatternId,
   type ScaleMode,
   type SoundSettings,
@@ -91,8 +92,10 @@ interface AppState {
   removeArrangementPattern: (index: number) => void
   clearArrangement: () => void
   setArrangementTranspose: (index: number, semitones: number) => void
+  setArrangementRotation: (index: number, steps: number) => void
   toggleArrangementMute: (index: number, voice: VoiceId) => void
   setArrangementLayer: (index: number, voice: VoiceId, selection: ArrangementLayerSelection) => void
+  setArrangementEffect: (index: number, target: OccurrenceEffectTarget, value: number) => void
   setAutomationPoint: (target: AutomationTarget, step: number, value: number | null) => void
   applyStyle: (styleId: string, strength: number, preserve: StylePreserve, influences: StyleInfluence[]) => void
   setCodeDraft: (code: string) => void
@@ -287,6 +290,10 @@ export const useAppStore = create<AppState>((set, get) => {
       const occurrence = draft.arrangement[index]
       if (occurrence) occurrence.transpose = Math.round(clamp(semitones, -24, 24))
     }),
+    setArrangementRotation: (index, steps) => commitMutation((draft) => {
+      const occurrence = draft.arrangement[index]
+      if (occurrence) occurrence.rotate = Math.round(clamp(steps, -63, 63))
+    }),
     toggleArrangementMute: (index, voice) => commitMutation((draft) => {
       const occurrence = draft.arrangement[index]
       if (!occurrence) return
@@ -300,6 +307,13 @@ export const useAppStore = create<AppState>((set, get) => {
       if (!occurrence) return
       if (selection === 'all') delete occurrence.layers[voice]
       else occurrence.layers[voice] = selection
+    }),
+    setArrangementEffect: (index, target, value) => commitMutation((draft) => {
+      const occurrence = draft.arrangement[index]
+      if (!occurrence) return
+      const normalized = target === 'mask' ? clamp(value, 0.25, 4) : clamp(value, -1, 1)
+      if ((target === 'mask' && normalized === 1) || (target !== 'mask' && normalized === 0)) delete occurrence.effects[target]
+      else occurrence.effects[target] = normalized
     }),
     setAutomationPoint: (target, stepIndex, value) => commitMutation((draft) => {
       getActivePattern(draft).automation[target][stepIndex] = value

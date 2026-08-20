@@ -24,10 +24,29 @@ describe('arrangement occurrences', () => {
 
     expect(migrated.formatVersion).toBe(FORMAT_VERSION)
     expect(migrated.arrangement).toEqual([
-      { pattern: 'A', transpose: 0, mute: [], layers: {} },
-      { pattern: 'C', transpose: 0, mute: [], layers: {} },
+      { pattern: 'A', transpose: 0, rotate: 0, mute: [], layers: {}, effects: {} },
+      { pattern: 'C', transpose: 0, rotate: 0, mute: [], layers: {}, effects: {} },
     ])
     expect(clonedAgain).toEqual(migrated)
+  })
+
+  it('rotates the whole occurrence memory without changing its source pattern', () => {
+    const composition = makeEmptyComposition()
+    const source = getPattern(composition, 'A')
+    source.steps[15].notes = ['B4']
+    source.automation.memory[15] = 0.84
+    source.automation.veil[15] = 0.61
+    const occurrence = makeArrangementOccurrence('A')
+    occurrence.rotate = 1
+    composition.arrangement = [occurrence]
+
+    const resolved = resolveArrangementOccurrence(composition, 0)
+
+    expect(resolved.pattern.steps[0].notes).toEqual(['B4'])
+    expect(resolved.pattern.automation.memory[0]).toBe(0.84)
+    expect(resolved.pattern.automation.veil[0]).toBe(0.61)
+    expect(source.steps[0].notes).toEqual([])
+    expect(source.automation.memory[0]).toBeNull()
   })
 
   it('resolves the source pattern without mutating it and transposes only pitches', () => {

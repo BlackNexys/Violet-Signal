@@ -147,7 +147,7 @@ export class VioletAudioEngine {
     const current = pattern.steps[this.step]
     const performance = this.callbacks.getPerformance()
     const stepDuration = Tone.Time('16n').toSeconds()
-    const resolved = resolveSequencerStep(composition, pattern, this.step, this.cycle, this.exhaustion, performance.pressure, stepDuration)
+    const resolved = resolveSequencerStep(composition, pattern, this.step, this.cycle, this.exhaustion, performance.pressure, stepDuration, occurrence)
     const veil = mapVeil(resolved.veil)
     const fracture = mapFracture(resolved.fracture)
     this.channels.chords?.filter.frequency.rampTo(clamp(resolved.mask * resolved.mapped.brightness, 80, 12000), 0.03)

@@ -160,7 +160,7 @@ describe('Violet Signal DSL', () => {
   it('round-trips transformed arrangement occurrences in canonical order', () => {
     const source = serializeComposition(makeEmptyComposition()).replace(
       /^ {2}arrangement:.*$/m,
-      '  arrangement: A C[layers=bass:primary+chords:shadow,mute=texture+pulse,transpose=12]',
+      '  arrangement: A C[effects=overclock:-0.2+mask:1.5+memory:0.25,layers=bass:primary+chords:shadow,mute=texture+pulse,rotate=-3,transpose=12]',
     )
 
     const result = parseComposition(source)
@@ -170,11 +170,13 @@ describe('Violet Signal DSL', () => {
     expect(result.composition.arrangement[1]).toEqual({
       pattern: 'C',
       transpose: 12,
+      rotate: -3,
       mute: ['pulse', 'texture'],
       layers: { bass: 'primary', chords: 'shadow' },
+      effects: { overclock: -0.2, mask: 1.5, memory: 0.25 },
     })
     expect(serializeComposition(result.composition)).toContain(
-      'arrangement: A C[transpose=12,mute=pulse+texture,layers=chords:shadow+bass:primary]',
+      'arrangement: A C[transpose=12,rotate=-3,mute=pulse+texture,layers=chords:shadow+bass:primary,effects=mask:1.5+memory:0.25+overclock:-0.2]',
     )
     const roundTrip = parseComposition(serializeComposition(result.composition))
     expect(roundTrip.ok && roundTrip.composition).toEqual(result.composition)
@@ -184,7 +186,10 @@ describe('Violet Signal DSL', () => {
     ['A[transpose=25]', 'can range from -24 to 24'],
     ['A[mute=signal]', 'mute can use'],
     ['A[layers=chords:shadow+chords:primary]', 'more than once'],
-    ['A[rotate=2]', 'not an arrangement occurrence setting'],
+    ['A[rotate=64]', 'can range from -63 to 63'],
+    ['A[effects=mask:0.1]', 'can range from 0.25 to 4'],
+    ['A[effects=veil:2]', 'can range from -1 to 1'],
+    ['A[effects=memory:0.2+memory:0.3]', 'more than once'],
   ])('rejects invalid occurrence %s', (occurrence, message) => {
     const result = parseComposition(`scene "Wrong Occurrence" {\n  arrangement: ${occurrence}\n}`)
     expect(result.ok).toBe(false)

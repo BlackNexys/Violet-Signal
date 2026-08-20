@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getPattern, makeEmptyComposition } from '../model/composition'
+import { getPattern, makeArrangementOccurrence, makeEmptyComposition } from '../model/composition'
 import { advanceFatigue, automatedValue, resolveSequencerStep } from './sequencing'
 
 describe('shared sequencer resolution', () => {
@@ -51,5 +51,27 @@ describe('shared sequencer resolution', () => {
     const resolved = resolveSequencerStep(composition, pattern, 6, 9, 0, false, 0.125)
     expect(resolved.shouldPlay).toBe(false)
     expect(resolved.ratchets).toBe(4)
+  })
+
+  it('applies occurrence effect modifiers after automation and clamps final values', () => {
+    const composition = makeEmptyComposition()
+    const pattern = getPattern(composition, 'A')
+    pattern.automation.mask[0] = 8_000
+    pattern.automation.memory[0] = 0.9
+    pattern.automation.veil[0] = 0.1
+    pattern.automation.fracture[0] = 0.2
+    pattern.automation.ghost[0] = 0.8
+    pattern.automation.overclock[0] = 0.7
+    const occurrence = makeArrangementOccurrence('A')
+    occurrence.effects = { mask: 2, memory: 0.4, veil: -0.4, fracture: 0.3, ghost: 0.5, overclock: -0.2 }
+
+    const resolved = resolveSequencerStep(composition, pattern, 0, 0, 0, false, 0.125, occurrence)
+
+    expect(resolved.mask).toBe(16_000)
+    expect(resolved.memory).toBe(1)
+    expect(resolved.veil).toBe(0)
+    expect(resolved.fracture).toBeCloseTo(0.5)
+    expect(resolved.ghost).toBe(1)
+    expect(resolved.overclock).toBeCloseTo(0.5)
   })
 })

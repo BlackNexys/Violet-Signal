@@ -110,12 +110,14 @@ describe('shared composition state', () => {
     useAppStore.getState().addArrangementPattern('C')
     expect(useAppStore.getState().composition.arrangement.map((occurrence) => occurrence.pattern)).toEqual(['B', 'C'])
     useAppStore.getState().setArrangementTranspose(1, 12)
+    useAppStore.getState().setArrangementRotation(1, 3)
     useAppStore.getState().toggleArrangementMute(1, 'pulse')
     useAppStore.getState().setArrangementLayer(1, 'chords', 'shadow')
+    useAppStore.getState().setArrangementEffect(1, 'memory', 0.25)
     expect(useAppStore.getState().composition.arrangement[1]).toEqual({
-      pattern: 'C', transpose: 12, mute: ['pulse'], layers: { chords: 'shadow' },
+      pattern: 'C', transpose: 12, rotate: 3, mute: ['pulse'], layers: { chords: 'shadow' }, effects: { memory: 0.25 },
     })
-    expect(useAppStore.getState().code).toContain('C[transpose=12,mute=pulse,layers=chords:shadow]')
+    expect(useAppStore.getState().code).toContain('C[transpose=12,rotate=3,mute=pulse,layers=chords:shadow,effects=memory:0.25]')
   })
 
   it('honors the selected live-code quantization boundary', () => {

@@ -83,7 +83,7 @@ export async function renderCompositionToWav(composition: Composition): Promise<
       const { occurrence, pattern } = resolveArrangementOccurrence(composition, bar)
       pattern.steps.forEach((step, index) => {
         const time = (stepCursor + index) * secondsPerStep
-        const resolved = resolveSequencerStep(composition, pattern, index, bar, fatigue.exhaustion, false, secondsPerStep)
+        const resolved = resolveSequencerStep(composition, pattern, index, bar, fatigue.exhaustion, false, secondsPerStep, occurrence)
         const automatedVeil = mapVeil(resolved.veil)
         const automatedFracture = mapFracture(resolved.fracture)
         const eventTime = time + resolved.timingOffset

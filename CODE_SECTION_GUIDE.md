@@ -39,7 +39,7 @@ scene "Your Scene Name" {
   lock: on
   patterns: A B C D
   active: A
-  arrangement: A A[transpose=12] B[mute=pulse] C[layers=chords:shadow]
+  arrangement: A A[transpose=12,rotate=-3,effects=memory:0.25] B[mute=pulse] C[layers=chords:shadow]
 
   // Voice, effect, pattern, and automation lines go here.
 }
@@ -87,17 +87,19 @@ Use integer seeds when asking an AI for variations. Reusing the same seed keeps 
 An arrangement entry begins with `A`, `B`, `C`, or `D`. Optional brackets change only that occurrence; they never rewrite the source pattern.
 
 ```text
-arrangement: A A[transpose=12] B[mute=pulse+texture] C[layers=chords:shadow+bass:primary]
+arrangement: A A[transpose=12,rotate=-3] B[mute=pulse+texture,effects=veil:0.2+fracture:0.15] C[layers=chords:shadow+bass:primary,effects=mask:1.5]
 ```
 
 Inside the brackets, comma-separated settings have a fixed meaning:
 
 - `transpose` is a whole number from `-24` to `24` semitones and affects Chord and Bass notes only.
+- `rotate` is a whole number from `-63` to `63`; positive values move the final steps to the front. It rotates events, expression data, and every automation lane together.
 - `mute` lists one or more voices joined by `+`: `chords`, `bass`, `pulse`, or `texture`.
 - `layers` lists `voice:all`, `voice:primary`, or `voice:shadow` assignments joined by `+`.
 - `shadow` explicitly plays the configured Shadow for that occurrence even when its normal enabled switch is off. `all` follows the normal Shadow enabled state.
+- `effects` joins `target:value` modifiers with `+`. `mask` is a `0.25`–`4` multiplier; `memory`, `veil`, `fracture`, `ghost`, and `overclock` are `-1`–`1` offsets.
 
-Canonical formatting orders settings as `transpose`, `mute`, then `layers`, and orders voices as Chord, Bass, Pulse, Texture. Pattern automation resolves first; these occurrence transforms resolve afterward. Performance gestures and final audio safety mapping remain later stages.
+Canonical formatting orders settings as `transpose`, `rotate`, `mute`, `layers`, then `effects`; voices use Chord, Bass, Pulse, Texture order and effects use Mask, Memory, Veil, Fracture, Ghost, Overclock order. Pattern automation resolves first, occurrence effect modifiers resolve afterward, performance gestures follow, and final audio safety mapping remains last. Rotation is virtual and never rewrites the source pattern.
 
 WAV export reproduces the written gain staging and effects, then peak-normalizes the completed file to `−1 dBFS`. The `output` value still changes how strongly the signal reaches the drive/limiter stages, but it no longer leaves an otherwise healthy export unnecessarily quiet. Peak normalization is not commercial loudness mastering.
 
@@ -385,9 +387,14 @@ patterns      = A B C D
 active        = A | B | C | D
 arrangement   = 1..16 OCCURRENCE values
 OCCURRENCE    = (A | B | C | D) ["[" OCCURRENCE_OPTION ["," OCCURRENCE_OPTION...] "]"]
+OCCURRENCE_OPTION = transpose | rotate | mute | layers | effects
 transpose     = integer -24..24
+rotate        = integer -63..63
 mute          = chords | bass | pulse | texture, joined by +
 layers        = VOICE:(all | primary | shadow), joined by +
+effects       = EFFECT_TARGET:number, joined by +
+EFFECT_TARGET = mask | memory | veil | fracture | ghost | overclock
+effect_modifier = mask:0.25..4 | (memory | veil | fracture | ghost | overclock):-1..1
 waveform      = sine | triangle | square | sawtooth
 filter_type   = lowpass | bandpass | highpass
 resonance     = number 0..12

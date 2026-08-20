@@ -58,9 +58,12 @@ function shadowLine(composition: Composition, id: VoiceId): string {
 function arrangementOccurrence(occurrence: ArrangementOccurrence): string {
   const options: string[] = []
   if (occurrence.transpose) options.push(`transpose=${occurrence.transpose}`)
+  if (occurrence.rotate) options.push(`rotate=${occurrence.rotate}`)
   if (occurrence.mute.length) options.push(`mute=${VOICE_IDS.filter((voice) => occurrence.mute.includes(voice)).join('+')}`)
   const layers = VOICE_IDS.flatMap((voice) => occurrence.layers[voice] ? [`${voice}:${occurrence.layers[voice]}`] : [])
   if (layers.length) options.push(`layers=${layers.join('+')}`)
+  const effects = (['mask', 'memory', 'veil', 'fracture', 'ghost', 'overclock'] as const).flatMap((target) => occurrence.effects[target] === undefined ? [] : [`${target}:${amount(occurrence.effects[target]!)}`])
+  if (effects.length) options.push(`effects=${effects.join('+')}`)
   return `${occurrence.pattern}${options.length ? `[${options.join(',')}]` : ''}`
 }
 

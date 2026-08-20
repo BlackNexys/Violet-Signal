@@ -24,6 +24,7 @@ export type InstrumentEngine = 'subtractive' | 'fm' | 'am' | 'dual' | 'pluck' | 
 export type NoteLane = 'notes' | 'bass'
 export type StepLane = NoteLane | 'drum' | 'texture'
 export type AutomationTarget = 'mask' | 'memory' | 'veil' | 'fracture' | 'ghost' | 'overclock'
+export type OccurrenceEffectTarget = AutomationTarget
 export type ApplyQuantization = 'step' | 'beat' | 'bar'
 
 export const SCALE_INTERVALS: Record<ScaleMode, readonly number[]> = {
@@ -99,8 +100,10 @@ export interface Pattern {
 export interface ArrangementOccurrence {
   pattern: PatternId
   transpose: number
+  rotate: number
   mute: VoiceId[]
   layers: Partial<Record<VoiceId, ArrangementLayerSelection>>
+  effects: Partial<Record<OccurrenceEffectTarget, number>>
 }
 
 export interface Composition {
@@ -260,7 +263,7 @@ export const makeEmptyPattern = (id: PatternId, stepCount = DEFAULT_STEP_COUNT):
 })
 
 export function makeArrangementOccurrence(pattern: PatternId): ArrangementOccurrence {
-  return { pattern, transpose: 0, mute: [], layers: {} }
+  return { pattern, transpose: 0, rotate: 0, mute: [], layers: {}, effects: {} }
 }
 
 export function normalizeArrangementOccurrence(
@@ -273,6 +276,8 @@ export function normalizeArrangementOccurrence(
   const pattern = input?.pattern && PATTERN_IDS.includes(input.pattern) ? input.pattern : fallback
   const rawTranspose = input?.transpose
   const transpose = Math.round(clamp(typeof rawTranspose === 'number' && Number.isFinite(rawTranspose) ? rawTranspose : 0, -24, 24))
+  const rawRotation = input?.rotate
+  const rotate = Math.round(clamp(typeof rawRotation === 'number' && Number.isFinite(rawRotation) ? rawRotation : 0, -63, 63))
   const inputMute = Array.isArray(input?.mute) ? input.mute : []
   const mute = VOICE_IDS.filter((voice) => inputMute.includes(voice))
   const layers: ArrangementOccurrence['layers'] = {}
@@ -280,7 +285,14 @@ export function normalizeArrangementOccurrence(
     const selection = input?.layers?.[voice]
     if (selection === 'primary' || selection === 'shadow') layers[voice] = selection
   }
-  return { pattern, transpose, mute, layers }
+  const effects: ArrangementOccurrence['effects'] = {}
+  for (const target of ['mask', 'memory', 'veil', 'fracture', 'ghost', 'overclock'] as OccurrenceEffectTarget[]) {
+    const value = input?.effects?.[target]
+    if (typeof value !== 'number' || !Number.isFinite(value)) continue
+    const normalized = target === 'mask' ? clamp(value, 0.25, 4) : clamp(value, -1, 1)
+    if ((target === 'mask' && normalized !== 1) || (target !== 'mask' && normalized !== 0)) effects[target] = normalized
+  }
+  return { pattern, transpose, rotate, mute, layers, effects }
 }
 
 export const makeEmptyComposition = (): Composition => ({

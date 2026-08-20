@@ -19,6 +19,7 @@ import {
   type AutomationTarget,
   type ArrangementLayerSelection,
   type NoteLane,
+  type OccurrenceEffectTarget,
   type StepLane,
 } from '../model/composition'
 import { arrangementOccurrenceDescription, arrangementOccurrenceLabel } from '../model/arrangement'
@@ -33,10 +34,19 @@ const automationBounds: Record<AutomationTarget, { min: number; max: number; ste
   ghost: { min: 0, max: 1, step: 0.01, label: 'Probability' },
   overclock: { min: 0, max: 1, step: 0.01, label: 'Performance pressure' },
 }
+const occurrenceEffectBounds: Record<OccurrenceEffectTarget, { min: number; max: number; step: number; neutral: number; label: string }> = {
+  mask: { min: 0.25, max: 4, step: 0.05, neutral: 1, label: 'Mask multiplier' },
+  memory: { min: -1, max: 1, step: 0.01, neutral: 0, label: 'Memory offset' },
+  veil: { min: -1, max: 1, step: 0.01, neutral: 0, label: 'Veil offset' },
+  fracture: { min: -1, max: 1, step: 0.01, neutral: 0, label: 'Fracture offset' },
+  ghost: { min: -1, max: 1, step: 0.01, neutral: 0, label: 'Ghost offset' },
+  overclock: { min: -1, max: 1, step: 0.01, neutral: 0, label: 'Overclock offset' },
+}
 
 export function SequencerPanel() {
   const [automationTarget, setAutomationTarget] = useState<AutomationTarget>('mask')
   const [selectedOccurrenceIndex, setSelectedOccurrenceIndex] = useState(0)
+  const [occurrenceEffectTarget, setOccurrenceEffectTarget] = useState<OccurrenceEffectTarget>('memory')
   const composition = useAppStore((state) => state.composition)
   const activeStep = useAppStore((state) => state.activeStep)
   const playingPatternId = useAppStore((state) => state.playingPatternId)
@@ -57,8 +67,10 @@ export function SequencerPanel() {
   const removeArrangementPattern = useAppStore((state) => state.removeArrangementPattern)
   const clearArrangement = useAppStore((state) => state.clearArrangement)
   const setArrangementTranspose = useAppStore((state) => state.setArrangementTranspose)
+  const setArrangementRotation = useAppStore((state) => state.setArrangementRotation)
   const toggleArrangementMute = useAppStore((state) => state.toggleArrangementMute)
   const setArrangementLayer = useAppStore((state) => state.setArrangementLayer)
+  const setArrangementEffect = useAppStore((state) => state.setArrangementEffect)
   const setAutomationPoint = useAppStore((state) => state.setAutomationPoint)
   const setStepExpression = useAppStore((state) => state.setStepExpression)
   const pattern = getActivePattern(composition)
@@ -77,6 +89,8 @@ export function SequencerPanel() {
   const fallbackAutomation = automationTarget === 'mask' ? composition.voices.chords.cutoff : composition.sound[automationTarget]
   const occurrenceIndex = Math.min(selectedOccurrenceIndex, composition.arrangement.length - 1)
   const occurrence = composition.arrangement[occurrenceIndex]
+  const occurrenceEffectConfig = occurrenceEffectBounds[occurrenceEffectTarget]
+  const occurrenceEffectValue = occurrence?.effects[occurrenceEffectTarget] ?? occurrenceEffectConfig.neutral
 
   const selectLane = (step: number, lane: StepLane) => selectStep(step, lane)
   const toggleAndSelect = (step: number, lane: 'drum' | 'texture') => {
@@ -135,6 +149,13 @@ export function SequencerPanel() {
             </div>
           </div>
           <div className="occurrence-editor__row">
+            <span>Rotate memory <output>{occurrence.rotate > 0 ? '+' : ''}{occurrence.rotate}</output></span>
+            <div className="occurrence-editor__buttons">
+              {[-4, -1, 1, 4].map((amount) => <button type="button" key={amount} disabled={occurrence.rotate + amount < -63 || occurrence.rotate + amount > 63} onClick={() => setArrangementRotation(occurrenceIndex, occurrence.rotate + amount)}>{amount > 0 ? '+' : ''}{amount}</button>)}
+              <button type="button" disabled={occurrence.rotate === 0} onClick={() => setArrangementRotation(occurrenceIndex, 0)}>Reset</button>
+            </div>
+          </div>
+          <div className="occurrence-editor__row">
             <span>Mute this time</span>
             <div className="occurrence-editor__buttons">
               {VOICE_IDS.map((voice) => <button type="button" key={voice} className={occurrence.mute.includes(voice) ? 'is-active' : ''} aria-pressed={occurrence.mute.includes(voice)} onClick={() => toggleArrangementMute(occurrenceIndex, voice)}>{voice === 'chords' ? 'Chord' : voice[0].toUpperCase() + voice.slice(1)}</button>)}
@@ -151,6 +172,14 @@ export function SequencerPanel() {
                 </select>
               </label>
             ))}
+          </div>
+          <div className="occurrence-editor__row occurrence-editor__effect">
+            <span>Effect transform <output>{occurrenceEffectTarget === 'mask' ? `×${occurrenceEffectValue.toFixed(2)}` : `${occurrenceEffectValue >= 0 ? '+' : ''}${occurrenceEffectValue.toFixed(2)}`}</output></span>
+            <select aria-label="Occurrence effect target" value={occurrenceEffectTarget} onChange={(event) => setOccurrenceEffectTarget(event.target.value as OccurrenceEffectTarget)}>
+              {(Object.keys(occurrenceEffectBounds) as OccurrenceEffectTarget[]).map((target) => <option key={target} value={target}>{occurrenceEffectBounds[target].label}</option>)}
+            </select>
+            <input aria-label={`Occurrence ${occurrenceEffectTarget} modifier`} type="range" min={occurrenceEffectConfig.min} max={occurrenceEffectConfig.max} step={occurrenceEffectConfig.step} value={occurrenceEffectValue} onChange={(event) => setArrangementEffect(occurrenceIndex, occurrenceEffectTarget, Number(event.target.value))} />
+            <button type="button" disabled={occurrenceEffectValue === occurrenceEffectConfig.neutral} onClick={() => setArrangementEffect(occurrenceIndex, occurrenceEffectTarget, occurrenceEffectConfig.neutral)}>Reset</button>
           </div>
         </div>
       )}

@@ -88,7 +88,7 @@ The sequencer groups cells according to the selected meter. `/4` beats read `1 e
 
 ### Build an arrangement
 
-Four independent patterns can be appended to an arrangement of up to sixteen occurrences. Select an occurrence to transpose its pitched events, mute voices for that repetition, or focus each voice on all enabled layers, Primary only, or Shadow only. The source pattern remains unchanged, and the transport shows both the sounding pattern and current occurrence. The model and precedence rules are documented in [`project-notes/arrangement-occurrences.md`](project-notes/arrangement-occurrences.md).
+Four independent patterns can be appended to an arrangement of up to sixteen occurrences. Select an occurrence to transpose its pitched events, rotate its complete step memory and automation, mute voices for that repetition, focus each voice on all enabled layers, Primary only, or Shadow only, and add bounded effect modifiers. The source pattern remains unchanged, and the transport shows both the sounding pattern and current occurrence. The model and precedence rules are documented in [`project-notes/arrangement-occurrences.md`](project-notes/arrangement-occurrences.md).
 
 Chord, Bass, Pulse, and Texture voices each have Primary and optional Shadow layers plus a shared selectable filter, ADSR envelope, level, mute, and solo settings. Every source is synthesized or procedurally generated; no remote samples are used.
 
@@ -127,7 +127,7 @@ scene "Rain Behind Glass" {
   lock: on
   patterns: A B C D
   active: A
-  arrangement: A A[transpose=12] B[mute=pulse] C[layers=chords:shadow]
+  arrangement: A A[transpose=12,rotate=-3,effects=memory:0.25] B[mute=pulse] C[layers=chords:shadow]
   voice chords: triangle volume=-10 cutoff=2550 attack=0.12 decay=0.62 sustain=0.64 release=2.2 mute=off solo=off
   voice bass: triangle volume=-9 cutoff=950 attack=0.012 decay=0.3 sustain=0.5 release=0.7 mute=off solo=off
   memory: 0.42
@@ -188,4 +188,4 @@ The audio graph is created only after a user gesture. A shared source factory bu
 
 ## Next valuable milestone
 
-Extend arrangement occurrences with whole-memory rotation and bounded effect modifiers. The adopted sequence—including interpolated automation, ties, and per-voice effect sends—is maintained in [`notes/instrument-sound-and-layer-expansion-plan.md`](notes/instrument-sound-and-layer-expansion-plan.md).
+Add Hold/Linear automation interpolation through one shared resolver used by playback, WAV rendering, previews, and occurrence effects. The adopted sequence—including true ties and per-voice effect sends—is maintained in [`notes/instrument-sound-and-layer-expansion-plan.md`](notes/instrument-sound-and-layer-expansion-plan.md).
