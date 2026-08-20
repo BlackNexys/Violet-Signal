@@ -1,6 +1,6 @@
 # Instrument Sound and Layer Expansion Plan
 
-Status: in progress — CLI rendering and first arrangement-occurrence slice completed
+Status: in progress — scale and engine vocabulary completed
 Date: 2026-08-19  
 Last planning update: 2026-08-20
 Last implementation update: 2026-08-20
@@ -10,12 +10,12 @@ Last implementation update: 2026-08-20
 The first vertical slice is implemented:
 
 - Format-v2 Primary/Shadow voice data and idempotent legacy migration.
-- Shared live/offline sources for subtractive, FM, AM, membrane, and noise engines.
-- Blacklight Core's four compatibility patches plus Veil Archive's Glass Choir and Undertow.
+- Shared live/offline sources for subtractive, FM, AM, dual, pluck, membrane, metal, and noise engines.
+- Blacklight Core, Veil Archive, Chrome Wound, and the first Fractured Relay patches.
 - Patch selection, editable layer controls, Custom provenance, undo/redo, and queued playback-boundary application.
 - Safe notation, CodeMirror support, IndexedDB/project normalization, documentation, and production-browser layered WAV coverage.
 
-The headless CLI is implemented with validation, canonical formatting, human-readable and JSON diagnostics, stable exit codes, and production-path WAV rendering through an installed Chrome or Edge browser. Its packaged executable is covered end to end. Format v3 arrangement occurrences are also implemented with transpose, per-voice mute, Primary/Shadow selection, legacy migration, notation, UI editing, and shared live/offline resolution. Scale modes and the Phase 0 profiling gate for dual, metal, and pluck are next; Chrome Wound, Fractured Relay, and Low Cinema remain later content work.
+The headless CLI is implemented with validation, formatting, and production-path WAV rendering. Format v3 arrangement occurrences provide transpose, per-voice mute, and Primary/Shadow selection. Dorian, Phrygian, harmonic minor, melodic minor, and pentatonic now share one interval registry across notation, keyboard choices, and chord suggestions. Dual and metal sources plus a bounded managed pluck pool run through the shared live/offline adapter; Chrome Wound and the first Fractured Relay patches exercise them in production-browser WAV coverage. Whole-memory occurrence rotation and bounded effect modifiers are next.
 
 ## Post-v2 feedback roadmap
 
@@ -163,6 +163,8 @@ Add rotation and effect modifiers immediately afterward, once the shared resolut
 
 ## Milestone D — Scale and engine vocabulary
 
+Status: completed 2026-08-20.
+
 Add Dorian, Phrygian, harmonic minor, melodic minor, and pentatonic modes while retaining major, minor, and unrestricted entry. Scale helpers, parser validation, UI choices, style recipes, transposition, and tests must use the same interval definitions.
 
 Resume the sound-engine profiling gate for:
@@ -213,7 +215,7 @@ Its design checkpoint must decide whether Signal receives its own pattern lane, 
 2. **Completed:** Specify format-v3 arrangement occurrences and build the shared occurrence resolver.
 3. **Completed:** Ship transpose, occurrence mute, and Primary/Shadow selection end to end.
 4. **Completed:** Add headless-browser `violet render` and verify the packaged WAV path.
-5. Add scale modes and complete dual, metal, and pluck profiling and patches.
+5. **Completed:** Add scale modes and complete dual, metal, and pluck profiling and patches.
 6. Add occurrence rotation and bounded effect modifiers.
 7. Add Hold/Linear automation interpolation.
 8. Add true ties and legato source lifecycles.

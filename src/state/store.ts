@@ -3,6 +3,8 @@ import { parseComposition, type FriendlyParseError } from '../dsl/parser'
 import { serializeComposition } from '../dsl/serializer'
 import {
   PATTERN_IDS,
+  SCALE_MODES,
+  SCALE_ROOTS,
   VOICE_IDS,
   clamp,
   cloneComposition,
@@ -20,6 +22,7 @@ import {
   type Composition,
   type NoteLane,
   type PatternId,
+  type ScaleMode,
   type SoundSettings,
   type Step,
   type StepLane,
@@ -70,7 +73,7 @@ interface AppState {
   updateVoice: <K extends Exclude<keyof VoiceSettings, 'patchId' | 'layers'>>(voice: VoiceId, key: K, value: VoiceSettings[K]) => void
   updateVoiceLayer: <K extends keyof VoiceLayerSettings>(voice: VoiceId, slot: LayerSlot, key: K, value: VoiceLayerSettings[K]) => void
   applyInstrumentPatch: (voice: VoiceId, patchId: string) => void
-  updateRoot: (key: 'bpm' | 'masterVolume' | 'scaleLock', value: number | boolean) => void
+  updateRoot: (key: 'bpm' | 'masterVolume' | 'scaleLock' | 'scaleRoot' | 'scaleMode', value: number | boolean | string) => void
   selectVoice: (voice: VoiceId) => void
   selectStep: (step: number, lane?: StepLane) => void
   assignNote: (note: string) => void
@@ -209,6 +212,8 @@ export const useAppStore = create<AppState>((set, get) => {
       if (key === 'bpm' && typeof value === 'number') draft.bpm = value
       if (key === 'masterVolume' && typeof value === 'number') draft.masterVolume = value
       if (key === 'scaleLock' && typeof value === 'boolean') draft.scaleLock = value
+      if (key === 'scaleRoot' && typeof value === 'string' && SCALE_ROOTS.includes(value as (typeof SCALE_ROOTS)[number])) draft.scaleRoot = value
+      if (key === 'scaleMode' && typeof value === 'string' && SCALE_MODES.includes(value as ScaleMode)) draft.scaleMode = value as ScaleMode
     }),
     selectVoice: (selectedVoice) => set({ selectedVoice }),
     selectStep: (selectedStep, selectedLane = get().selectedLane) => set({ selectedStep, selectedLane }),

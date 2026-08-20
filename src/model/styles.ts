@@ -85,8 +85,17 @@ const common = {
   arrangement: ['A', 'A', 'B', 'C'] as PatternId[],
 }
 
+const EXPANDED_HARMONY_MODES: Partial<Record<string, ScaleMode>> = {
+  ambient: 'dorian',
+  'witch-house': 'harmonic minor',
+  'hip-hop': 'pentatonic',
+  'industrial-ebm': 'phrygian',
+  cinematic: 'melodic minor',
+}
+
 function defineStyle(definition: Omit<StyleDefinition, 'version'> & { version?: number }): StyleDefinition {
-  return { ...definition, version: definition.version ?? 1 }
+  const mode = EXPANDED_HARMONY_MODES[definition.id] ?? definition.harmony.mode
+  return { ...definition, version: definition.version ?? 1, harmony: { ...definition.harmony, mode } }
 }
 
 export const STYLE_DEFINITIONS: StyleDefinition[] = [

@@ -73,7 +73,7 @@ For example, in 4/4 steps `01 05 09 13` are the four quarter-note downbeats. Ste
 | `steps` | `8`, `12`, `14`, `16`, `20`, `24`, `28`, `32`, or `64` | Number of cells in every pattern. Put this before event lines. |
 | `swing` | `0`–`0.75` | Delays alternating steps while keeping step 01 and the loop seam anchored. |
 | `seed` | Whole number `0`–`2147483647` | Makes Ghost and other chance behavior repeatable. |
-| `scale` | Root plus `minor` or `major`, such as `C minor` or `F# major` | Scale used by scale-aware visual tools. |
+| `scale` | Root plus `minor`, `major`, `dorian`, `phrygian`, `harmonic minor`, `melodic minor`, or `pentatonic` | Scale used by scale-aware keys and chord suggestions. Pentatonic is the minor-pentatonic interval set. |
 | `lock` | `on` or `off` | Enables or disables scale locking in the visual instrument. |
 | `patterns` | `A B C D` exactly once each | Declares the four available patterns. Keep this line unchanged. |
 | `active` | `A`, `B`, `C`, or `D` | Pattern shown for editing. The arrangement decides what playback sounds. |
@@ -116,7 +116,7 @@ layer chords shadow: on engine=fm waveform=sine octave=1 detune=7 level=-17 char
 | Setting | Accepted value | Meaning |
 | --- | --- | --- |
 | First token | `sine`, `triangle`, `square`, or `sawtooth` | Primary waveform. Noise engines map these choices to procedural noise colors. |
-| `engine` | Chord/Bass: `subtractive`, `fm`, `am`; Pulse: `membrane`, `noise`; Texture: `noise` | Bounded synthesis model compatible with that voice. |
+| `engine` | Chord/Bass: `subtractive`, `fm`, `am`, `dual`, `pluck`; Pulse: `membrane`, `metal`, `noise`; Texture: `metal`, `noise` | Bounded synthesis model compatible with that voice. |
 | `octave` | Whole number `-2`–`2` | Primary pitch shift without editing written notes. |
 | `layer-level` | `-36`–`0` | Primary source level before the voice channel. |
 | `character` | `0`–`1` | Engine-specific tone macro. |
@@ -379,7 +379,7 @@ meter         = 4/4 | 3/4 | 6/8 | 5/4 | 7/8
 steps         = 8 | 12 | 14 | 16 | 20 | 24 | 28 | 32 | 64
 swing         = number 0..0.75
 seed          = integer 0..2147483647
-scale         = NOTE_ROOT (minor | major)
+scale         = NOTE_ROOT (minor | major | dorian | phrygian | harmonic minor | melodic minor | pentatonic)
 lock          = on | off
 patterns      = A B C D
 active        = A | B | C | D

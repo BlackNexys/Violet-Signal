@@ -1,6 +1,6 @@
 # Violet Signal instrument packs
 
-Status: first vertical slice implemented 2026-08-19.
+Status: expanded engine vocabulary implemented 2026-08-20.
 
 ## Mental model
 
@@ -23,19 +23,24 @@ This adds timbral depth without adding sequencer lanes. Mute, solo, Mask automat
 
 The migration runs through `cloneComposition`, so scenes, IndexedDB snapshots, undo history, and imported project objects share one normalization path. The safe notation parser continues accepting legacy voice lines. The current format is v3 because arrangement occurrences were added later; v2 layer data remains unchanged and canonical v3 notation includes it explicitly.
 
-## Engines in the first slice
+## Engine compatibility
 
 | Engine | Roles | Tone source |
 | --- | --- | --- |
 | `subtractive` | Chord, Bass | `PolySynth(Synth)` / `MonoSynth` |
 | `fm` | Chord, Bass | `PolySynth(FMSynth)` / `FMSynth` |
 | `am` | Chord, Bass | `PolySynth(AMSynth)` / `AMSynth` |
+| `dual` | Chord, Bass | `PolySynth(DuoSynth)` / `DuoSynth` |
+| `pluck` | Chord, Bass | managed `PluckSynth` pool |
 | `membrane` | Pulse | `MembraneSynth` |
+| `metal` | Pulse, Texture | `MetalSynth` |
 | `noise` | Pulse, Texture | `NoiseSynth` |
 
 Compatibility is declared once in `ENGINES_BY_VOICE` and enforced by model helpers, notation parsing, patch validation, state actions, and UI options.
 
-Character is a normalized `0..1` macro. Pure mappings translate it to bounded FM harmonicity/modulation index, AM harmonicity, or membrane pitch decay/octave range. Engines that do not need a special mapping retain the normalized value for future-compatible patch data.
+Character is a normalized `0..1` macro. Pure mappings translate it to bounded FM harmonicity/modulation index, AM harmonicity, dual-oscillator spread/vibrato, pluck excitation/dampening/resonance, membrane pitch decay/octave range, or metallic harmonicity/modulation/filter range. Engines that do not need a special mapping retain the normalized value for future-compatible patch data.
+
+Chord layers cap Tone polyphony at eight voices. The physical-pluck adapter uses an explicit eight-source Chord pool and four-source Bass pool, reusing sources in deterministic round-robin order and scheduling every release. Per-source gains retain step velocity. This keeps dense chords and ratchets bounded without making pluck live-only; the same pool runs inside Tone Offline.
 
 ## Pack registry
 
@@ -45,6 +50,8 @@ The first registry contains:
 
 - **Blacklight Core** — Quiet Circuit, Underline, Heart Signal, and Rain Carrier reproduce the calibrated original voices.
 - **Veil Archive** — Glass Choir combines an AM Primary with a quiet octave-up FM Shadow; Undertow combines a sine subtractive bass with a restrained FM Shadow.
+- **Chrome Wound** — Razor Assembly and Reactor use dual oscillators; Iron Pulse and Arc Ash combine membrane, metal, and noise layers.
+- **Fractured Relay** — Wire Below provides a managed physical-pluck bass; Relay Click provides a clipped metallic transient.
 
 Patch ids use `pack-id/patch-id@version`. Applying a patch copies its complete settings into the composition. Playback never requires a registry lookup, so a future pack revision cannot silently alter an existing project. Changing a sound-defining layer, filter, envelope, or channel value clears provenance to **Custom**; mute and solo do not.
 
@@ -63,12 +70,12 @@ External pack import is intentionally out of scope. When added, it must validate
 
 `src/audio/instrumentSource.ts` is shared by live and offline rendering. It owns engine construction, Character mapping, pitch transposition, layer gain, envelope response scaling, triggering, release, and disposal. The live engine may rebuild a source when its engine changes; all other safe updates are applied to the existing source.
 
-The browser smoke test applies Glass Choir and renders it through the production offline WAV path. Node unit tests cover mappings and data behavior; the actual offline audio test is conditionally skipped when the test runtime has no native `OfflineAudioContext`.
+The browser smoke test applies dual, pluck, and metal patches across all four voices and renders them together through the production offline WAV path. Node unit tests cover mappings, compatibility, notation, and data behavior; the actual Node offline audio test is conditionally skipped when the runtime has no native `OfflineAudioContext`.
 
 ## Current boundaries
 
 - Exactly two layer slots per voice.
 - No per-layer effects, automation, mute, or solo.
 - No samples, remote assets, or new runtime dependencies.
-- No dual-oscillator, metal, or pluck engines yet.
+- Pluck articulation is intentionally short and pooled; true ties remain a separate lifecycle milestone.
 - Pack provenance is descriptive; concrete serialized values are authoritative.

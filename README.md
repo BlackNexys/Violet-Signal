@@ -27,9 +27,11 @@ The headline scenes teach four different starting grammars:
 
 ## Layer instrument sounds
 
-Each of the four voices now has a required **Primary** source and an optional **Shadow** source. Pitched voices can use subtractive, FM, or AM synthesis; Pulse uses membrane or noise synthesis; Texture remains procedural noise. Layer altitude, detune, level, Character, and response scales are explicit composition data and render identically in live playback and offline WAV output.
+Each of the four voices now has a required **Primary** source and an optional **Shadow** source. Chord and Bass can use subtractive, FM, AM, dual-oscillator, or managed physical-pluck synthesis; Pulse and Texture add metallic and procedural-noise sources. Layer altitude, detune, level, Character, and response scales are explicit composition data and render identically in live playback and offline WAV output.
 
-The first built-in sound packs are **Blacklight Core**, which preserves the original calibrated voices, and **Veil Archive**, which introduces the layered **Glass Choir** chord patch and **Undertow** bass patch. Applying a patch is undoable, queues to the selected musical boundary during playback, and becomes **Custom** after manual sound editing. Sound-pack architecture and extension rules are documented in [`project-notes/instrument-packs.md`](project-notes/instrument-packs.md).
+The built-in packs include **Blacklight Core**, **Veil Archive**, the dual/metal **Chrome Wound** family, and the physical-string **Fractured Relay** voices. Applying a patch is undoable, queues to the selected musical boundary during playback, and becomes **Custom** after manual sound editing. Sound-pack architecture and extension rules are documented in [`project-notes/instrument-packs.md`](project-notes/instrument-packs.md).
+
+Scale-aware keys and chord suggestions support major, minor, Dorian, Phrygian, harmonic minor, melodic minor, and minor pentatonic modes. Root and mode are editable directly above the touch keyboard; disabling Scale lock keeps unrestricted chromatic entry available.
 
 ## Run it
 
@@ -186,4 +188,4 @@ The audio graph is created only after a user gesture. A shared source factory bu
 
 ## Next valuable milestone
 
-Add Dorian, Phrygian, harmonic minor, melodic minor, and pentatonic scale modes, then complete the profiling gate for dual, metal, and pluck engines. The adopted sequence—including occurrence rotation, interpolated automation, ties, and per-voice effect sends—is maintained in [`notes/instrument-sound-and-layer-expansion-plan.md`](notes/instrument-sound-and-layer-expansion-plan.md).
+Extend arrangement occurrences with whole-memory rotation and bounded effect modifiers. The adopted sequence—including interpolated automation, ties, and per-voice effect sends—is maintained in [`notes/instrument-sound-and-layer-expansion-plan.md`](notes/instrument-sound-and-layer-expansion-plan.md).

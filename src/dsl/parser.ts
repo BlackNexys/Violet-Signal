@@ -5,6 +5,7 @@ import {
   STEP_COUNT_OPTIONS,
   isNote,
   isEngineCompatible,
+  SCALE_MODES,
   makeArrangementOccurrence,
   makeEmptyComposition,
   noteToMidi,
@@ -35,7 +36,7 @@ class DslError extends Error {
 const WAVEFORMS: Waveform[] = ['sine', 'triangle', 'square', 'sawtooth']
 const FILTER_TYPES: FilterType[] = ['lowpass', 'highpass', 'bandpass']
 const VOICES: VoiceId[] = ['chords', 'bass', 'pulse', 'texture']
-const ENGINES: InstrumentEngine[] = ['subtractive', 'fm', 'am', 'membrane', 'noise']
+const ENGINES: InstrumentEngine[] = ['subtractive', 'fm', 'am', 'dual', 'pluck', 'membrane', 'metal', 'noise']
 const STYLE_IDS = STYLE_DEFINITIONS.map((style) => style.id)
 function fail(message: string, line: number, excerpt: string): never { throw new DslError(message, line, excerpt) }
 function slugify(name: string) { return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'untitled-signal' }
@@ -351,10 +352,11 @@ export function parseComposition(source: string): ParseResult {
           composition.seed = seed; break
         }
         case 'scale': {
-          const scale = /^([A-G](?:#|b)?)\s+(minor|major)$/i.exec(value)
-          if (!scale || noteToMidi(`${scale[1]}4`) === null) fail('Scale needs a root and mood, such as “C minor”.', lineNumber, rawLine)
+          const scale = /^([A-G](?:#|b)?)\s+(.+)$/i.exec(value)
+          const mode = scale?.[2].toLowerCase() as ScaleMode | undefined
+          if (!scale || !mode || !SCALE_MODES.includes(mode) || noteToMidi(`${scale[1]}4`) === null) fail(`Scale needs a root and mode: ${SCALE_MODES.join(', ')}.`, lineNumber, rawLine)
           composition.scaleRoot = scale[1][0].toUpperCase() + scale[1].slice(1)
-          composition.scaleMode = scale[2].toLowerCase() as ScaleMode; break
+          composition.scaleMode = mode; break
         }
         case 'lock': composition.scaleLock = onOff(value, 'Scale lock', lineNumber, rawLine); break
         case 'patterns': {

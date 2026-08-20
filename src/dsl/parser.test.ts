@@ -123,6 +123,30 @@ describe('Violet Signal DSL', () => {
     if (!result.ok) expect(result.error.message).toContain('not available for the pulse voice')
   })
 
+  it('round-trips the expanded engine vocabulary through compatible layers', () => {
+    const source = serializeComposition(makeEmptyComposition())
+      .replace('engine=subtractive', 'engine=dual')
+      .replace('layer chords shadow: off engine=subtractive', 'layer chords shadow: on engine=pluck')
+      .replace('voice pulse: sine engine=membrane', 'voice pulse: sine engine=metal')
+      .replace('voice texture: sawtooth engine=noise', 'voice texture: sawtooth engine=metal')
+    const result = parseComposition(source)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.composition.voices.chords.layers).toMatchObject({ primary: { engine: 'dual' }, shadow: { engine: 'pluck', enabled: true } })
+    expect(result.composition.voices.pulse.layers.primary.engine).toBe('metal')
+    expect(result.composition.voices.texture.layers.primary.engine).toBe('metal')
+    expect(parseComposition(serializeComposition(result.composition))).toEqual({ ok: true, composition: result.composition })
+  })
+
+  it.each(['dorian', 'phrygian', 'harmonic minor', 'melodic minor', 'pentatonic'] as const)('round-trips the %s scale mode', (mode) => {
+    const source = serializeComposition(makeEmptyComposition()).replace('scale: C minor', `scale: F# ${mode}`)
+    const result = parseComposition(source)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.composition.scaleMode).toBe(mode)
+    expect(serializeComposition(result.composition)).toContain(`scale: F# ${mode}`)
+  })
+
   it('marks hand-edited patch settings as custom while keeping explicit values', () => {
     const layered = applyInstrumentPatch(makeEmptyComposition(), 'chords', 'veil-archive/glass-choir@1')
     const edited = serializeComposition(layered).replace('character=0.42', 'character=0.43')

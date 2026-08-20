@@ -2,12 +2,15 @@ import { useEffect } from 'react'
 import { Activity, AudioWaveform, CloudRain, Gauge, Radio, RotateCcw, ShieldCheck, Snowflake, Zap } from 'lucide-react'
 import {
   ENGINES_BY_VOICE,
+  SCALE_MODES,
+  SCALE_ROOTS,
   midiToNote,
   notesForScale,
   noteToMidi,
   type FilterType,
   type InstrumentEngine,
   type LayerSlot,
+  type ScaleMode,
   type VoiceId,
   type Waveform,
 } from '../model/composition'
@@ -29,10 +32,17 @@ const engineLabels: Record<InstrumentEngine, string> = {
   subtractive: 'Signal — classic synth',
   fm: 'Specter — FM',
   am: 'Halo — AM',
+  dual: 'Twin — dual oscillator',
+  pluck: 'Wire — physical pluck',
   membrane: 'Impact — membrane',
+  metal: 'Shard — metallic',
   noise: 'Weather — noise',
 }
 const keyBindings = ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k']
+const scaleModeLabels: Record<ScaleMode, string> = {
+  minor: 'Minor', major: 'Major', dorian: 'Dorian', phrygian: 'Phrygian',
+  'harmonic minor': 'Harmonic minor', 'melodic minor': 'Melodic minor', pentatonic: 'Pentatonic',
+}
 
 export function InstrumentPanel({ audition }: InstrumentPanelProps) {
   const composition = useAppStore((state) => state.composition)
@@ -121,7 +131,7 @@ export function InstrumentPanel({ audition }: InstrumentPanelProps) {
         <div className="layer-rack">
           {(['primary', 'shadow'] as LayerSlot[]).map((slot) => {
             const layer = voice.layers[slot]
-            const pitched = layer.engine === 'subtractive' || layer.engine === 'fm' || layer.engine === 'am' || layer.engine === 'membrane'
+            const pitched = layer.engine !== 'noise'
             return (
               <div className={`layer-row${slot === 'shadow' && !layer.enabled ? ' is-disabled' : ''}`} key={slot}>
                 <div className="layer-heading">
@@ -198,7 +208,11 @@ export function InstrumentPanel({ audition }: InstrumentPanelProps) {
 
       <div className="keyboard-heading">
         <span>Assign & play · step {String(selectedStep + 1).padStart(2, '0')} · {selectedLane}</span>
-        <label className="lock-toggle" title="Scale lock keeps playable keys inside the selected scale"><input type="checkbox" checked={composition.scaleLock} onChange={(event) => updateRoot('scaleLock', event.target.checked)} />Scale lock</label>
+        <div className="scale-controls">
+          <label><span className="sr-only">Scale root</span><select value={composition.scaleRoot} onChange={(event) => updateRoot('scaleRoot', event.target.value)}>{SCALE_ROOTS.map((root) => <option key={root}>{root}</option>)}</select></label>
+          <label><span className="sr-only">Scale mode</span><select value={composition.scaleMode} onChange={(event) => updateRoot('scaleMode', event.target.value)}>{SCALE_MODES.map((mode) => <option key={mode} value={mode}>{scaleModeLabels[mode]}</option>)}</select></label>
+          <label className="lock-toggle" title="Scale lock keeps playable keys inside the selected scale"><input type="checkbox" checked={composition.scaleLock} onChange={(event) => updateRoot('scaleLock', event.target.checked)} />Scale lock</label>
+        </div>
       </div>
       <div className="touch-keyboard" aria-label={composition.scaleLock ? `${composition.scaleRoot} ${composition.scaleMode} playable notes` : 'Chromatic playable notes'}>
         {keyboard.map((note, index) => (

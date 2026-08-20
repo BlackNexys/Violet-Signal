@@ -13,4 +13,13 @@ describe('layered instrument mappings', () => {
     expect(mapLayerCharacter('membrane', 0)).toEqual({ pitchDecay: 0.01, octaves: 2 })
     expect(mapLayerCharacter('membrane', 1)).toEqual({ pitchDecay: 0.08, octaves: 7 })
   })
+
+  it('keeps dual, pluck, and metal macros inside their profiled ranges', () => {
+    expect(mapLayerCharacter('dual', 0)).toEqual({ harmonicity: 0.995, vibratoAmount: 0.015, vibratoRate: 0.4 })
+    expect(mapLayerCharacter('dual', 1)).toEqual({ harmonicity: 1.005, vibratoAmount: 0.175, vibratoRate: 5 })
+    expect(mapLayerCharacter('pluck', 0)).toEqual({ attackNoise: 0.5, dampening: 1200, resonance: 0.7 })
+    expect(mapLayerCharacter('pluck', 1)).toEqual({ attackNoise: 2.3, dampening: 6000, resonance: 0.97 })
+    expect(mapLayerCharacter('metal', 0)).toEqual({ harmonicity: 2.5, modulationIndex: 12, octaves: 0.5, resonance: 180 })
+    expect(mapLayerCharacter('metal', 1)).toEqual({ harmonicity: 6, modulationIndex: 40, octaves: 4, resonance: 3380 })
+  })
 })

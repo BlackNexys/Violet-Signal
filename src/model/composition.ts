@@ -5,12 +5,14 @@ export const STEP_COUNT_OPTIONS = [8, 12, 14, 16, 20, 24, 28, 32, 64] as const
 export const METERS = ['4/4', '3/4', '6/8', '5/4', '7/8'] as const
 export const PATTERN_IDS = ['A', 'B', 'C', 'D'] as const
 export const VOICE_IDS = ['chords', 'bass', 'pulse', 'texture'] as const
+export const SCALE_ROOTS = ['C', 'C#', 'Db', 'D', 'D#', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'G#', 'Ab', 'A', 'A#', 'Bb', 'B'] as const
+export const SCALE_MODES = ['minor', 'major', 'dorian', 'phrygian', 'harmonic minor', 'melodic minor', 'pentatonic'] as const
 export const FORMAT_VERSION = 3
 
 export type PatternId = (typeof PATTERN_IDS)[number]
 export type Waveform = 'sine' | 'triangle' | 'square' | 'sawtooth'
 export type FilterType = 'lowpass' | 'highpass' | 'bandpass'
-export type ScaleMode = 'minor' | 'major'
+export type ScaleMode = (typeof SCALE_MODES)[number]
 export type StyleId = string
 /** @deprecated `world` remains the serialized compatibility name for a style id. */
 export type SoundWorld = StyleId
@@ -18,11 +20,21 @@ export type Meter = (typeof METERS)[number]
 export type VoiceId = (typeof VOICE_IDS)[number]
 export type LayerSlot = 'primary' | 'shadow'
 export type ArrangementLayerSelection = 'all' | LayerSlot
-export type InstrumentEngine = 'subtractive' | 'fm' | 'am' | 'membrane' | 'noise'
+export type InstrumentEngine = 'subtractive' | 'fm' | 'am' | 'dual' | 'pluck' | 'membrane' | 'metal' | 'noise'
 export type NoteLane = 'notes' | 'bass'
 export type StepLane = NoteLane | 'drum' | 'texture'
 export type AutomationTarget = 'mask' | 'memory' | 'veil' | 'fracture' | 'ghost' | 'overclock'
 export type ApplyQuantization = 'step' | 'beat' | 'bar'
+
+export const SCALE_INTERVALS: Record<ScaleMode, readonly number[]> = {
+  minor: [0, 2, 3, 5, 7, 8, 10],
+  major: [0, 2, 4, 5, 7, 9, 11],
+  dorian: [0, 2, 3, 5, 7, 9, 10],
+  phrygian: [0, 1, 3, 5, 7, 8, 10],
+  'harmonic minor': [0, 2, 3, 5, 7, 8, 11],
+  'melodic minor': [0, 2, 3, 5, 7, 9, 11],
+  pentatonic: [0, 3, 5, 7, 10],
+}
 
 export interface Step {
   notes: string[]
@@ -164,10 +176,10 @@ const DEFAULT_ENGINES: Record<VoiceId, InstrumentEngine> = {
 }
 
 export const ENGINES_BY_VOICE: Record<VoiceId, InstrumentEngine[]> = {
-  chords: ['subtractive', 'fm', 'am'],
-  bass: ['subtractive', 'fm', 'am'],
-  pulse: ['membrane', 'noise'],
-  texture: ['noise'],
+  chords: ['subtractive', 'fm', 'am', 'dual', 'pluck'],
+  bass: ['subtractive', 'fm', 'am', 'dual', 'pluck'],
+  pulse: ['membrane', 'metal', 'noise'],
+  texture: ['metal', 'noise'],
 }
 
 export interface VoiceRecipe extends Partial<Omit<VoiceSettings, 'patchId' | 'layers'>> {
@@ -330,23 +342,26 @@ export function transposeNote(note: string, semitones: number): string {
 
 export function notesForScale(root: string, mode: ScaleMode, octave = 4): string[] {
   const rootMidi = noteToMidi(`${root}${octave}`) ?? 60
-  const intervals = mode === 'minor' ? [0, 2, 3, 5, 7, 8, 10, 12] : [0, 2, 4, 5, 7, 9, 11, 12]
-  return intervals.map((interval) => midiToNote(rootMidi + interval))
+  const intervals = SCALE_INTERVALS[mode]
+  return Array.from({ length: 8 }, (_, degree) => {
+    const interval = intervals[degree % intervals.length] + Math.floor(degree / intervals.length) * 12
+    return midiToNote(rootMidi + interval)
+  })
 }
 
 export function chordSuggestions(composition: Composition): Array<{ name: string; notes: string[] }> {
-  const scale = notesForScale(composition.scaleRoot, composition.scaleMode)
-  const degreeNames = composition.scaleMode === 'minor'
-    ? ['i', 'ii°', 'III', 'iv', 'v', 'VI', 'VII']
-    : ['I', 'ii', 'iii', 'IV', 'V', 'vi', 'vii°']
-  return degreeNames.map((name, degree) => ({
-    name,
-    notes: [scale[degree], scale[(degree + 2) % 7], scale[(degree + 4) % 7]].map((note, index) => {
-      const midi = noteToMidi(note) ?? 60
-      const rootMidi = noteToMidi(scale[degree]) ?? 60
-      return midi < rootMidi || (index > 0 && midi <= (noteToMidi(scale[degree]) ?? 60)) ? midiToNote(midi + 12) : note
-    }),
-  }))
+  const rootMidi = noteToMidi(`${composition.scaleRoot}4`) ?? 60
+  const intervals = SCALE_INTERVALS[composition.scaleMode]
+  const roman = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII']
+  const midiForDegree = (degree: number) => rootMidi + intervals[degree % intervals.length] + Math.floor(degree / intervals.length) * 12
+  return intervals.map((_, degree) => {
+    const notes = [degree, degree + 2, degree + 4].map((scaleDegree) => midiForDegree(scaleDegree))
+    const shape = [notes[1] - notes[0], notes[2] - notes[0]]
+    const quality = shape[0] === 3 && shape[1] === 7 ? 'minor' : shape[0] === 3 && shape[1] === 6 ? 'diminished' : shape[0] === 4 && shape[1] === 8 ? 'augmented' : 'major'
+    const numeral = quality === 'minor' || quality === 'diminished' ? roman[degree].toLowerCase() : roman[degree]
+    const suffix = quality === 'diminished' ? '°' : quality === 'augmented' ? '+' : ''
+    return { name: `${numeral}${suffix}`, notes: notes.map(midiToNote) }
+  })
 }
 
 export function defaultChord(composition: Composition): string[] {
@@ -403,6 +418,8 @@ export function cloneComposition(composition: Composition): Composition {
     styleVersion: composition.styleVersion ?? 1,
     styleInfluences: (composition.styleInfluences ?? []).map((influence) => ({ ...influence, amount: clamp(influence.amount, 0, 1) })),
     meter: METERS.includes(composition.meter) ? composition.meter : '4/4',
+    scaleRoot: SCALE_ROOTS.includes(composition.scaleRoot as (typeof SCALE_ROOTS)[number]) ? composition.scaleRoot : 'C',
+    scaleMode: SCALE_MODES.includes(composition.scaleMode) ? composition.scaleMode : 'minor',
     stepCount,
     swing: clamp(composition.swing ?? 0, 0, 0.75),
     sound: { ...DEFAULT_SOUND_SETTINGS, ...composition.sound },

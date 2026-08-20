@@ -42,6 +42,20 @@ export const SOUND_PACKS: SoundPackDefinition[] = [
     description: 'Glass harmonics, slow shadows, and low-frequency afterimages.',
     tags: ['darkwave', 'ambient', 'spectral'],
   },
+  {
+    id: 'chrome-wound',
+    version: 1,
+    label: 'Chrome Wound',
+    description: 'Detuned machinery, metallic impacts, and bright industrial debris.',
+    tags: ['industrial', 'wide', 'metallic'],
+  },
+  {
+    id: 'fractured-relay',
+    version: 1,
+    label: 'Fractured Relay',
+    description: 'Short physical strings and clipped machine transients.',
+    tags: ['pluck', 'glitch', 'percussive'],
+  },
 ]
 
 function definePatch(
@@ -81,6 +95,36 @@ export const INSTRUMENT_PATCHES: InstrumentPatchDefinition[] = [
     primary: { engine: 'subtractive', waveform: 'sine', character: 0.12, level: -1 },
     shadow: { enabled: true, engine: 'fm', waveform: 'sine', octave: 0, detune: -6, level: -18, character: 0.28, attackScale: 0.8, releaseScale: 0.75 },
   }),
+  definePatch('chrome-wound', 'razor-assembly', 'Razor Assembly', 'Wide dual-oscillator saw stack', ['wide', 'bright', 'unstable'], 'chords', {
+    cutoff: 3600, resonance: 2.1, attack: 0.025, decay: 0.42, sustain: 0.5, release: 1.25, volume: -15,
+    primary: { engine: 'dual', waveform: 'sawtooth', detune: -5, level: -4, character: 0.62 },
+    shadow: { enabled: true, engine: 'fm', waveform: 'square', octave: 1, detune: 8, level: -22, character: 0.48, attackScale: 0.7, releaseScale: 0.75 },
+  }),
+  definePatch('chrome-wound', 'reactor', 'Reactor', 'Dual-oscillator bass with a restrained sub shadow', ['driven', 'low', 'mechanical'], 'bass', {
+    cutoff: 820, resonance: 2.8, attack: 0.012, decay: 0.3, sustain: 0.58, release: 0.62, glide: 0.045, volume: -11,
+    primary: { engine: 'dual', waveform: 'sawtooth', detune: -3, level: -5, character: 0.38 },
+    shadow: { enabled: true, engine: 'subtractive', waveform: 'sine', octave: -1, level: -19, character: 0.08, releaseScale: 0.8 },
+  }),
+  definePatch('chrome-wound', 'iron-pulse', 'Iron Pulse', 'Membrane body with a metallic attack', ['heavy', 'metallic', 'short'], 'pulse', {
+    cutoff: 3300, resonance: 1.4, attack: 0.005, decay: 0.13, sustain: 0, release: 0.1, volume: -19,
+    primary: { engine: 'membrane', waveform: 'sine', level: -3, character: 0.58 },
+    shadow: { enabled: true, engine: 'metal', waveform: 'square', octave: 1, level: -21, character: 0.72, attackScale: 0.5, releaseScale: 0.55 },
+  }),
+  definePatch('chrome-wound', 'arc-ash', 'Arc Ash', 'Bright metallic debris in a noise cloud', ['bright', 'broken', 'textural'], 'texture', {
+    cutoff: 4100, filterType: 'bandpass', resonance: 3.6, attack: 0.008, decay: 0.24, sustain: 0.02, release: 0.42, volume: -25,
+    primary: { engine: 'metal', waveform: 'triangle', octave: 1, level: -9, character: 0.82 },
+    shadow: { enabled: true, engine: 'noise', waveform: 'square', level: -24, character: 0.35, releaseScale: 1.4 },
+  }),
+  definePatch('fractured-relay', 'wire-below', 'Wire Below', 'Short physical-string bass with a dry sub edge', ['plucked', 'dark', 'precise'], 'bass', {
+    cutoff: 1350, resonance: 1.9, attack: 0.005, decay: 0.18, sustain: 0.08, release: 0.48, volume: -11,
+    primary: { engine: 'pluck', waveform: 'triangle', level: -5, character: 0.44 },
+    shadow: { enabled: true, engine: 'subtractive', waveform: 'sine', octave: -1, level: -22, character: 0.1, releaseScale: 0.5 },
+  }),
+  definePatch('fractured-relay', 'relay-click', 'Relay Click', 'Clipped metallic machine transient', ['click', 'industrial', 'dry'], 'pulse', {
+    cutoff: 5200, filterType: 'highpass', resonance: 2.2, attack: 0.005, decay: 0.06, sustain: 0, release: 0.045, volume: -22,
+    primary: { engine: 'metal', waveform: 'square', octave: 1, level: -8, character: 0.34 },
+    shadow: { enabled: true, engine: 'noise', waveform: 'square', level: -27, character: 0.2, releaseScale: 0.5 },
+  }),
 ]
 
 const patchMap = new Map(INSTRUMENT_PATCHES.map((patch) => [patch.id, patch]))
@@ -110,13 +154,23 @@ export function applyInstrumentPatch(composition: Composition, role: VoiceId, pa
 export function validateInstrumentPatches(): string[] {
   const errors: string[] = []
   const ids = new Set<string>()
+  const inRange = (value: number, minimum: number, maximum: number) => Number.isFinite(value) && value >= minimum && value <= maximum
   for (const patch of INSTRUMENT_PATCHES) {
     if (ids.has(patch.id)) errors.push(`Duplicate patch id: ${patch.id}`)
     ids.add(patch.id)
     if (!SOUND_PACKS.some((pack) => pack.id === patch.packId)) errors.push(`Unknown pack for ${patch.id}`)
-    for (const layer of Object.values(patch.settings.layers)) {
+    if (!patch.settings.layers.primary.enabled) errors.push(`${patch.id} disables its Primary layer`)
+    for (const [slot, layer] of Object.entries(patch.settings.layers)) {
       if (!isEngineCompatible(patch.role, layer.engine)) errors.push(`${patch.id} uses ${layer.engine} on ${patch.role}`)
+      if (!Number.isInteger(layer.octave) || !inRange(layer.octave, -2, 2)) errors.push(`${patch.id} ${slot} octave is out of range`)
+      if (!inRange(layer.detune, -100, 100)) errors.push(`${patch.id} ${slot} detune is out of range`)
+      if (!inRange(layer.level, -36, 0)) errors.push(`${patch.id} ${slot} level is out of range`)
+      if (!inRange(layer.character, 0, 1)) errors.push(`${patch.id} ${slot} Character is out of range`)
+      if (!inRange(layer.attackScale, 0.25, 4) || !inRange(layer.releaseScale, 0.25, 4)) errors.push(`${patch.id} ${slot} response is out of range`)
     }
+    if (!inRange(patch.settings.cutoff, 80, 12_000)) errors.push(`${patch.id} cutoff is out of range`)
+    if (!inRange(patch.settings.resonance, 0, 12)) errors.push(`${patch.id} resonance is out of range`)
+    if (!inRange(patch.settings.volume, -36, -4)) errors.push(`${patch.id} volume is out of range`)
   }
   return errors
 }

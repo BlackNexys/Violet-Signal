@@ -11,7 +11,13 @@ describe('layered instrument packs', () => {
       'blacklight-core/underline@1',
       'veil-archive/glass-choir@1',
       'veil-archive/undertow@1',
+      'chrome-wound/razor-assembly@1',
+      'chrome-wound/iron-pulse@1',
+      'fractured-relay/wire-below@1',
     ]))
+    expect(new Set(INSTRUMENT_PATCHES.flatMap((patch) => Object.values(patch.settings.layers).map((layer) => layer.engine)))).toEqual(
+      new Set(['subtractive', 'fm', 'am', 'dual', 'pluck', 'membrane', 'metal', 'noise']),
+    )
   })
 
   it('applies a patch without mutating the source composition or registry', () => {

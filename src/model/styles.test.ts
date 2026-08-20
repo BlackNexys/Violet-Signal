@@ -18,6 +18,9 @@ describe('data-driven style registry', () => {
     expect(ids).toHaveLength(19)
     expect(new Set(ids).size).toBe(ids.length)
     expect(ids).toEqual(expect.arrayContaining(['ambient', 'synthpop', 'witch-house', 'house', 'acid', 'drum-and-bass', 'industrial-ebm', 'chiptune', 'glitch', 'cinematic']))
+    expect(new Set(STYLE_DEFINITIONS.map((style) => style.harmony.mode))).toEqual(
+      new Set(['minor', 'major', 'dorian', 'phrygian', 'harmonic minor', 'melodic minor', 'pentatonic']),
+    )
   })
 
   it.each(STYLE_DEFINITIONS.map((style) => [style.id] as const))('applies %s inside the composition contract', (id) => {

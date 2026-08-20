@@ -4,7 +4,7 @@ import { Decoration, EditorView, MatchDecorator, ViewPlugin, type DecorationSet 
 import { basicSetup } from 'codemirror'
 import { useEffect, useRef } from 'react'
 import { activeTokenRanges } from '../dsl/serializer'
-import type { PatternId } from '../model/composition'
+import { SCALE_MODES, type PatternId } from '../model/composition'
 import { STYLE_DEFINITIONS } from '../model/styles'
 import { INSTRUMENT_PATCHES } from '../model/instrumentPacks'
 
@@ -58,7 +58,7 @@ const noteHighlights = matcherPlugin(/\b[A-G](?:#|b)?-?\d\b/g, 'cm-dsl-note')
 const patternHighlights = matcherPlugin(/\b(?:A|B|C|D)\b/g, 'cm-dsl-pattern')
 
 const completions = [
-  'format-version: 3', ...STYLE_DEFINITIONS.map((style) => `style: ${style.id}`), 'style-version: 1', 'influences: ambient=0.25', 'tempo: ', 'meter: 4/4', 'steps: 16', 'swing: 0.08', 'seed: ', 'scale: C minor', 'lock: on', 'patterns: A B C D', 'active: A',
+  'format-version: 3', ...STYLE_DEFINITIONS.map((style) => `style: ${style.id}`), 'style-version: 1', 'influences: ambient=0.25', 'tempo: ', 'meter: 4/4', 'steps: 16', 'swing: 0.08', 'seed: ', ...SCALE_MODES.map((mode) => `scale: C ${mode}`), 'lock: on', 'patterns: A B C D', 'active: A',
   ...INSTRUMENT_PATCHES.map((patch) => `patch ${patch.role}: ${patch.id}`),
   'arrangement: A A[transpose=12] B[mute=pulse] C[layers=chords:shadow]', 'voice chords: triangle engine=subtractive octave=0 detune=0 layer-level=0 character=0.28 attack-scale=1 release-scale=1 filter=lowpass cutoff=2800 resonance=0.8 glide=0 volume=-10 attack=0.05 decay=0.38 sustain=0.58 release=1.4 mute=off solo=off',
   'layer chords shadow: off engine=subtractive waveform=triangle octave=0 detune=0 level=-18 character=0.28 attack-scale=1 release-scale=1',
