@@ -14,11 +14,37 @@ import { textureNoiseType } from './signalPath'
 export interface VoiceRuntimeModifiers {
   envelopeScale: number
   pitchDriftCents: number
+  liveMonitoring: boolean
 }
 
 export const NEUTRAL_VOICE_MODIFIERS: VoiceRuntimeModifiers = {
   envelopeScale: 1,
   pitchDriftCents: 0,
+  liveMonitoring: false,
+}
+
+const ENGINE_MONITOR_TRIM_DB: Record<InstrumentEngine, number> = {
+  subtractive: 0,
+  fm: 10,
+  am: 14,
+  dual: -3,
+  pluck: 3,
+  membrane: 0,
+  metal: -6,
+  noise: 0,
+}
+
+/** Compensates Tone engine output differences only in the real-time monitor path. */
+export function engineMonitorTrimDb(engine: InstrumentEngine): number {
+  return ENGINE_MONITOR_TRIM_DB[engine]
+}
+
+const LIVE_START_LEAD_SECONDS = 0.002
+const LIVE_START_SEPARATION_SECONDS = 0.001
+
+/** Prevents Tone's unsynced Sources from receiving equal/past starts after a late scheduler callback. */
+export function monotonicLiveStartTime(requested: number, immediate: number, previous: number): number {
+  return Math.max(requested, immediate + LIVE_START_LEAD_SECONDS, previous + LIVE_START_SEPARATION_SECONDS)
 }
 
 interface LayerSource {
@@ -332,10 +358,15 @@ function shiftedNotes(notes: string | string[] | null, octave: number): string |
 export class LayeredVoiceSource {
   private readonly gains: Record<LayerSlot, Tone.Volume>
   private readonly sources: Partial<Record<LayerSlot, LayerSource>> = {}
+  private readonly retiredSources = new Set<LayerSource>()
+  private readonly retirementTimers = new Map<LayerSource, ReturnType<typeof setTimeout>>()
+  private readonly lastStartTimes: Record<LayerSlot, number> = { primary: Number.NEGATIVE_INFINITY, shadow: Number.NEGATIVE_INFINITY }
   private settings: VoiceSettings
+  private liveMonitoring: boolean
 
   constructor(private readonly role: VoiceId, output: Tone.InputNode, settings: VoiceSettings, modifiers: VoiceRuntimeModifiers = NEUTRAL_VOICE_MODIFIERS) {
     this.settings = settings
+    this.liveMonitoring = modifiers.liveMonitoring
     this.gains = {
       primary: new Tone.Volume(settings.layers.primary.level).connect(output),
       shadow: new Tone.Volume(settings.layers.shadow.level).connect(output),
@@ -344,20 +375,39 @@ export class LayeredVoiceSource {
   }
 
   update(settings: VoiceSettings, modifiers: VoiceRuntimeModifiers = NEUTRAL_VOICE_MODIFIERS): void {
+    const previousSettings = this.settings
     const shadowWasEnabled = this.settings.layers.shadow.enabled
     this.settings = settings
+    this.liveMonitoring = modifiers.liveMonitoring
     for (const slot of ['primary', 'shadow'] as LayerSlot[]) {
       const layer = settings.layers[slot]
       const current = this.sources[slot]
       if (!current || current.engine !== layer.engine) {
-        current?.release()
-        current?.dispose()
+        if (current) this.retire(current, previousSettings.release * previousSettings.layers[slot].releaseScale)
         this.sources[slot] = makeLayerSource(this.role, layer, this.gains[slot])
       }
-      this.gains[slot].volume.rampTo(layer.level, 0.05)
+      const monitorTrim = modifiers.liveMonitoring ? engineMonitorTrimDb(layer.engine) : 0
+      this.gains[slot].volume.rampTo(layer.level + monitorTrim, 0.05)
       this.sources[slot]?.update(layer, settings, modifiers)
     }
     if (shadowWasEnabled && !settings.layers.shadow.enabled) this.sources.shadow?.release()
+  }
+
+  private startTime(slot: LayerSlot, requested: number): number {
+    if (!this.liveMonitoring) return requested
+    const next = monotonicLiveStartTime(requested, Tone.immediate(), this.lastStartTimes[slot])
+    this.lastStartTimes[slot] = next
+    return next
+  }
+
+  private retire(source: LayerSource, releaseSeconds: number): void {
+    source.release()
+    this.retiredSources.add(source)
+    const timer = setTimeout(() => {
+      this.retirementTimers.delete(source)
+      if (this.retiredSources.delete(source)) source.dispose()
+    }, Math.ceil((Math.max(0.05, releaseSeconds) + 0.1) * 1000))
+    this.retirementTimers.set(source, timer)
   }
 
   trigger(notes: string | string[] | null, duration: number, time: number, velocity: number, selection: ArrangementLayerSelection = 'all'): void {
@@ -365,7 +415,7 @@ export class LayeredVoiceSource {
       const layer = this.settings.layers[slot]
       const selected = selection === 'all' ? slot === 'primary' || layer.enabled : slot === selection
       if (!selected) continue
-      this.sources[slot]?.trigger(shiftedNotes(notes, layer.octave), duration, time, velocity)
+      this.sources[slot]?.trigger(shiftedNotes(notes, layer.octave), duration, this.startTime(slot, time), velocity)
     }
   }
 
@@ -381,7 +431,7 @@ export class LayeredVoiceSource {
     for (const slot of ['primary', 'shadow'] as LayerSlot[]) {
       const layer = this.settings.layers[slot]
       const selected = selection === 'all' ? slot === 'primary' || layer.enabled : slot === selection
-      if (selected) this.sources[slot]?.[action](shiftedNotes(notes, layer.octave), time, velocity)
+      if (selected) this.sources[slot]?.[action](shiftedNotes(notes, layer.octave), this.startTime(slot, time), velocity)
       else this.sources[slot]?.release(time)
     }
   }
@@ -392,8 +442,12 @@ export class LayeredVoiceSource {
 
   dispose(): void {
     for (const source of Object.values(this.sources)) source.dispose()
+    for (const timer of this.retirementTimers.values()) clearTimeout(timer)
+    for (const source of this.retiredSources) source.dispose()
     this.sources.primary = undefined
     this.sources.shadow = undefined
+    this.retirementTimers.clear()
+    this.retiredSources.clear()
     this.gains.primary.dispose()
     this.gains.shadow.dispose()
   }

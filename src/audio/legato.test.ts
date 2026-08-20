@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { resolvePitchedLifecycle } from './legato'
+import { resolvePendingRelease, resolvePitchedLifecycle } from './legato'
 
 describe('pitched legato lifecycle', () => {
   it('attacks an outgoing tie and changes pitch through a chain', () => {
@@ -14,5 +14,11 @@ describe('pitched legato lifecycle', () => {
 
   it('breaks a tie before ratcheted retriggers', () => {
     expect(resolvePitchedLifecycle(true, true, true, 3)).toEqual({ mode: 'trigger', releasePrevious: true, held: false })
+  })
+
+  it('keeps a terminal tie alive for its authored gate unless another note replaces it', () => {
+    expect(resolvePendingRelease(4, 2, null)).toEqual({ releaseTime: null, pendingAt: 4 })
+    expect(resolvePendingRelease(4, 4, null)).toEqual({ releaseTime: 4, pendingAt: null })
+    expect(resolvePendingRelease(4, 3, 3.08)).toEqual({ releaseTime: 3.08, pendingAt: null })
   })
 })

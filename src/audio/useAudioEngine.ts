@@ -4,6 +4,7 @@ import { VioletAudioEngine } from './engine'
 
 export function useAudioEngine() {
   const engineRef = useRef<VioletAudioEngine | null>(null)
+  const transportCommandRef = useRef(0)
   const composition = useAppStore((state) => state.composition)
   const performancePressure = useAppStore((state) => state.performancePressure)
   const memoryFreeze = useAppStore((state) => state.memoryFreeze)
@@ -19,12 +20,32 @@ export function useAudioEngine() {
   }
 
   useEffect(() => { engineRef.current?.update(composition) }, [composition, performancePressure, memoryFreeze])
-  useEffect(() => () => engineRef.current?.dispose(), [])
+  useEffect(() => () => {
+    transportCommandRef.current += 1
+    engineRef.current?.dispose()
+  }, [])
   const enable = useCallback(async () => { await engineRef.current?.initialize(useAppStore.getState().composition); useAppStore.getState().setAudioReady(true) }, [])
-  const play = useCallback(async () => { await enable(); engineRef.current?.start(); useAppStore.getState().setPlaying(true) }, [enable])
-  const pause = useCallback(() => { engineRef.current?.pause(); useAppStore.getState().setPlaying(false) }, [])
-  const stop = useCallback(() => { engineRef.current?.stop(); useAppStore.getState().setPlaying(false) }, [])
-  const panic = useCallback(() => { engineRef.current?.panic(); useAppStore.getState().setPlaying(false) }, [])
+  const play = useCallback(async () => {
+    const command = ++transportCommandRef.current
+    await enable()
+    if (command !== transportCommandRef.current) return
+    if (engineRef.current?.start()) useAppStore.getState().setPlaying(true)
+  }, [enable])
+  const pause = useCallback(() => {
+    transportCommandRef.current += 1
+    engineRef.current?.pause()
+    useAppStore.getState().setPlaying(false)
+  }, [])
+  const stop = useCallback(() => {
+    transportCommandRef.current += 1
+    engineRef.current?.stop()
+    useAppStore.getState().setPlaying(false)
+  }, [])
+  const panic = useCallback(() => {
+    transportCommandRef.current += 1
+    engineRef.current?.panic()
+    useAppStore.getState().setPlaying(false)
+  }, [])
   const audition = useCallback(async (note: string) => {
     await enable()
     engineRef.current?.audition(note, useAppStore.getState().selectedVoice)

@@ -191,7 +191,7 @@ Automation should progress from the current held-value lanes to explicit interpo
 
 The implemented pure automation resolver is used by the live engine, offline renderer, UI previews, and occurrence-effect resolution. Missing persisted modes migrate to Hold. Linear values interpolate at each step and continue through the final-to-first loop segment; empty lanes use the global fallback and one-point lanes remain constant. Canonical notation omits default Hold and adds `linear` after the pattern id when selected.
 
-Real ties use `>` as an explicit outgoing connection and source adapters expose attack, pitch change, and release lifecycles rather than encoding ties as unusually long gates. The shared decision model continues eligible authored events across pattern and occurrence boundaries, and releases on rests, mute, failed Chance, Ghost substitution, ratchets, pause, stop, panic, engine/layer replacement, and offline completion. Mono compatible engines preserve Glide; Chords retain common tones; physical plucks re-excite only changed strings.
+Real ties use `>` as an explicit outgoing connection and source adapters expose attack, pitch change, and release lifecycles rather than encoding ties as unusually long gates. The shared decision model continues eligible authored events across pattern and occurrence boundaries, preserves the terminal event's authored gate unless a new note replaces it, and releases on rests, mute, failed Chance, Ghost substitution, ratchets, pause, stop, panic, and offline completion. Engine/layer replacement releases the old source and retires it after its tail. Mono compatible engines preserve Glide; Chords retain common tones; physical plucks re-excite only changed strings.
 
 ## Milestone F — Per-voice effect sends
 
@@ -207,7 +207,7 @@ voice channels -> dry bus ---------------------------------> output
               -> Environment --> shared Environment return-|
 ```
 
-Global effect controls continue to shape the shared processors and returns; per-voice send values control how much Chord, Signal, Bass, Pulse, and Texture enter each processor. Missing sends on legacy voices normalize to `1`, while the new Signal role uses a calibrated depth map. A `0.78` dry trim, `0.72` send-input trim, existing input trim, and final limiter protect the parallel sum. Drive moved after the recombined returns, so this retains routing intent rather than attempting to reproduce every interaction from the former serial chain.
+Global effect controls continue to shape the shared processors and returns; per-voice send values control how much Chord, Signal, Bass, Pulse, and Texture enter each processor. Missing sends on legacy voices normalize to `1`, while the new Signal role uses a calibrated depth map. A unity dry branch, `0.72` send-input trim, dynamic compensation for the nominal dry-plus-return sum, and the final limiter protect the parallel graph. Drive moved after the compensated returns, so this retains routing intent rather than attempting to reproduce every interaction from the former serial chain. Memory's dotted-eighth delay derives from project BPM in both live and offline playback.
 
 One routing factory now instantiates the graph for live playback and offline WAV rendering. The Instrument exposes the sends as the selected voice's **Depth** controls, canonical notation writes `send-fracture`, `send-veil`, `send-memory`, and `send-environment`, and sound-patch selection preserves these routing choices. Unit, production build, live browser, and offline-WAV coverage validate gain staging, feedback safety, mute/solo behavior, automation, disposal, and renderer parity.
 
@@ -551,6 +551,7 @@ Layering must not simply double loudness.
 - Test two-layer chords at maximum practical chord size and ratchets in current supported browsers.
 - Decide whether `pluck` meets polyphony, lifecycle, and offline parity requirements; defer it if a managed pool is not reliable.
 - Tune initial engine mappings and layer trim using normalized loudness comparisons, not peak alone.
+- Keep live monitoring practical with a bounded post-mix boost and engine-aware AM/FM compensation; do not bake monitor calibration into composition values or normalized WAV output.
 
 Exit: an engine compatibility matrix, CPU/polyphony budget, and four approved representative sounds.
 

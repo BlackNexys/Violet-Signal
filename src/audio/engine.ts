@@ -3,9 +3,9 @@ import { VOICE_IDS, clamp, meterParts, stepsPerBeat, type ApplyQuantization, typ
 import { occurrenceAllowsVoice, occurrenceLayerSelection, resolveArrangementOccurrence, transposeOccurrenceNote, transposeOccurrenceNotes } from '../model/arrangement'
 import { mapOverclock } from './overclock'
 import { advanceFatigue, resolveSequencerStep } from './sequencing'
-import { LIMITER_CEILING_DB, masterOutputDb } from './signalPath'
+import { LIMITER_CEILING_DB, liveMonitorOutputDb, memoryDelaySeconds } from './signalPath'
 import { LayeredVoiceSource } from './instrumentSource'
-import { resolvePitchedLifecycle } from './legato'
+import { resolvePendingRelease, resolvePitchedLifecycle } from './legato'
 import {
   automateParallelEffectRouting,
   createParallelEffectRouting,
@@ -36,8 +36,10 @@ export class VioletAudioEngine {
   private routing: ParallelEffectRouting | null = null
   private limiter: Tone.Limiter | null = null
   private recorder: Tone.Recorder | null = null
+  private initialization: Promise<void> | null = null
   private scheduleId: number | null = null
   private initialized = false
+  private disposed = false
   private recording = false
   private step = 0
   private cycle = 0
@@ -50,9 +52,9 @@ export class VioletAudioEngine {
   private chordTied = false
   private signalTied = false
   private bassTied = false
-  private chordReleasePending = false
-  private signalReleasePending = false
-  private bassReleasePending = false
+  private chordReleaseAt: number | null = null
+  private signalReleaseAt: number | null = null
+  private bassReleaseAt: number | null = null
 
   constructor(private readonly callbacks: AudioEngineCallbacks) {}
 
@@ -66,13 +68,27 @@ export class VioletAudioEngine {
   }
 
   async initialize(composition: Composition): Promise<void> {
+    if (this.disposed) return
     await Tone.start()
-    if (this.initialized) return
+    if (this.disposed) return
+    if (this.initialized) { this.update(composition); return }
+    if (!this.initialization) this.initialization = this.initializeGraph(composition)
+    try {
+      await this.initialization
+    } finally {
+      this.initialization = null
+    }
+    if (this.initialized) this.update(composition)
+  }
+
+  private async initializeGraph(composition: Composition): Promise<void> {
+    if (this.initialized || this.disposed) return
     this.limiter = new Tone.Limiter(LIMITER_CEILING_DB).toDestination()
     this.recorder = new Tone.Recorder()
-    this.routing = createParallelEffectRouting(composition.sound, 0, composition.masterVolume, Tone.Time('8n.').toSeconds(), this.limiter)
+    this.routing = createParallelEffectRouting(composition.sound, 0, liveMonitorOutputDb(composition.masterVolume, 0), memoryDelaySeconds(composition.bpm), this.limiter)
     this.limiter.connect(this.recorder)
     await this.routing.reverb.ready
+    if (this.disposed) return
 
     for (const id of VOICE_IDS) this.channels[id] = this.makeChannel(composition, id)
     for (const id of VOICE_IDS) {
@@ -83,7 +99,6 @@ export class VioletAudioEngine {
     transport.timeSignature = meterParts(composition.meter)
     this.scheduleId = transport.scheduleRepeat((time) => this.tick(time), '16n')
     this.initialized = true
-    this.update(composition)
   }
 
   update(composition: Composition): void {
@@ -97,7 +112,10 @@ export class VioletAudioEngine {
     const transport = Tone.getTransport()
     transport.timeSignature = meterParts(composition.meter)
     Tone.getTransport().bpm.rampTo(composition.bpm, 0.08)
-    if (this.routing) updateParallelEffectRouting(this.routing, composition.sound, mapped.drive, masterOutputDb(composition.masterVolume, mapped.outputTrimDb), this.callbacks.getPerformance().freeze)
+    if (this.routing) {
+      updateParallelEffectRouting(this.routing, composition.sound, mapped.drive, liveMonitorOutputDb(composition.masterVolume, mapped.outputTrimDb), this.callbacks.getPerformance().freeze)
+      this.routing.delay.delayTime.rampTo(memoryDelaySeconds(composition.bpm), 0.08)
+    }
 
     const anySolo = Object.values(composition.voices).some((voice) => voice.solo)
     for (const id of VOICE_IDS) {
@@ -113,8 +131,8 @@ export class VioletAudioEngine {
     }
     for (const id of VOICE_IDS) {
       this.sources[id]?.update(composition.voices[id], id === 'chords' || id === 'signal'
-        ? { envelopeScale: mapped.envelopeScale, pitchDriftCents: mapped.pitchDriftCents }
-        : { envelopeScale: 1, pitchDriftCents: 0 })
+        ? { envelopeScale: mapped.envelopeScale, pitchDriftCents: mapped.pitchDriftCents, liveMonitoring: true }
+        : { envelopeScale: 1, pitchDriftCents: 0, liveMonitoring: true })
     }
   }
 
@@ -132,7 +150,7 @@ export class VioletAudioEngine {
     const stepDuration = Tone.Time('16n').toSeconds()
     const resolved = resolveSequencerStep(composition, pattern, this.step, this.cycle, this.exhaustion, performance.pressure, stepDuration, occurrence)
     this.channels.chords?.filter.frequency.rampTo(clamp(resolved.mask * resolved.mapped.brightness, 80, 12000), 0.03)
-    if (this.routing) automateParallelEffectRouting(this.routing, resolved.memory, resolved.veil, resolved.fracture, performance.freeze)
+    if (this.routing) automateParallelEffectRouting(this.routing, resolved.memory, resolved.veil, resolved.fracture, composition.sound.environment, performance.freeze)
 
     const jitteredTime = time + resolved.timingOffset
     const ratchetSpacing = stepDuration / resolved.ratchets
@@ -140,8 +158,9 @@ export class VioletAudioEngine {
 
     const chordAllowed = occurrenceAllowsVoice(composition, occurrence, 'chords')
     const chordCanSound = current.notes.length > 0 && resolved.shouldPlay && chordAllowed
-    if (this.chordReleasePending) this.sources.chords?.release(chordCanSound ? jitteredTime : time)
-    this.chordReleasePending = false
+    const chordPending = resolvePendingRelease(this.chordReleaseAt, time, chordCanSound ? jitteredTime : null)
+    if (chordPending.releaseTime !== null) this.sources.chords?.release(chordPending.releaseTime)
+    this.chordReleaseAt = chordPending.pendingAt
     const chordLifecycle = resolvePitchedLifecycle(this.chordTied, chordCanSound, current.chordTie, resolved.ratchets)
     if (chordLifecycle.releasePrevious) this.sources.chords?.release(chordCanSound ? jitteredTime : time)
     if (current.notes.length && resolved.shouldPlay && chordAllowed) this.lastChord = [...current.notes]
@@ -154,7 +173,7 @@ export class VioletAudioEngine {
       if (chordLifecycle.mode === 'attack') this.sources.chords?.attack(chord, jitteredTime, velocity, selection)
       else if (chordLifecycle.mode === 'change') {
         this.sources.chords?.change(chord, jitteredTime, velocity, selection)
-        if (!chordLifecycle.held) this.chordReleasePending = true
+        if (!chordLifecycle.held) this.chordReleaseAt = jitteredTime + intendedDuration
       } else for (const triggerTime of triggerTimes) this.sources.chords?.trigger(chord, duration, triggerTime, velocity, selection)
     } else if (resolved.shouldPlay && chordAllowed && resolved.isGhostChord) {
       const chord = transposeOccurrenceNotes(this.lastChord, occurrence)
@@ -164,8 +183,9 @@ export class VioletAudioEngine {
 
     const signalAllowed = occurrenceAllowsVoice(composition, occurrence, 'signal')
     const signalCanSound = Boolean(current.signal) && resolved.shouldPlay && signalAllowed
-    if (this.signalReleasePending) this.sources.signal?.release(signalCanSound ? jitteredTime : time)
-    this.signalReleasePending = false
+    const signalPending = resolvePendingRelease(this.signalReleaseAt, time, signalCanSound ? jitteredTime : null)
+    if (signalPending.releaseTime !== null) this.sources.signal?.release(signalPending.releaseTime)
+    this.signalReleaseAt = signalPending.pendingAt
     const signalLifecycle = resolvePitchedLifecycle(this.signalTied, signalCanSound, current.signalTie, resolved.ratchets)
     if (signalLifecycle.releasePrevious) this.sources.signal?.release(signalCanSound ? jitteredTime : time)
     if (signalCanSound && current.signal) {
@@ -177,15 +197,16 @@ export class VioletAudioEngine {
       if (signalLifecycle.mode === 'attack') this.sources.signal?.attack(signal, jitteredTime, velocity, selection)
       else if (signalLifecycle.mode === 'change') {
         this.sources.signal?.change(signal, jitteredTime, velocity, selection)
-        if (!signalLifecycle.held) this.signalReleasePending = true
+        if (!signalLifecycle.held) this.signalReleaseAt = jitteredTime + intendedDuration
       } else for (const triggerTime of triggerTimes) this.sources.signal?.trigger(signal, duration, triggerTime, velocity, selection)
     }
     this.signalTied = signalLifecycle.held
 
     const bassAllowed = occurrenceAllowsVoice(composition, occurrence, 'bass')
     const bassCanSound = Boolean(current.bass) && resolved.shouldPlay && bassAllowed
-    if (this.bassReleasePending) this.sources.bass?.release(bassCanSound ? jitteredTime : time)
-    this.bassReleasePending = false
+    const bassPending = resolvePendingRelease(this.bassReleaseAt, time, bassCanSound ? jitteredTime : null)
+    if (bassPending.releaseTime !== null) this.sources.bass?.release(bassPending.releaseTime)
+    this.bassReleaseAt = bassPending.pendingAt
     const bassLifecycle = resolvePitchedLifecycle(this.bassTied, bassCanSound, current.bassTie, resolved.ratchets)
     if (bassLifecycle.releasePrevious) this.sources.bass?.release(bassCanSound ? jitteredTime : time)
     if (bassCanSound && current.bass) {
@@ -197,7 +218,7 @@ export class VioletAudioEngine {
       if (bassLifecycle.mode === 'attack') this.sources.bass?.attack(bass, jitteredTime, velocity, selection)
       else if (bassLifecycle.mode === 'change') {
         this.sources.bass?.change(bass, jitteredTime, velocity, selection)
-        if (!bassLifecycle.held) this.bassReleasePending = true
+        if (!bassLifecycle.held) this.bassReleaseAt = jitteredTime + intendedDuration
       } else for (const triggerTime of triggerTimes) this.sources.bass?.trigger(bass, duration, triggerTime, velocity, selection)
     }
     this.bassTied = bassLifecycle.held
@@ -233,15 +254,28 @@ export class VioletAudioEngine {
     }
   }
 
-  start(): void { if (this.initialized) Tone.getTransport().start() }
+  start(): boolean {
+    if (!this.initialized) return false
+    const transport = Tone.getTransport()
+    if (transport.state !== 'started') transport.start()
+    return true
+  }
   pause(): void {
-    Tone.getTransport().pause(); this.visualGeneration += 1
-    this.chordTied = false; this.signalTied = false; this.bassTied = false; this.chordReleasePending = false; this.signalReleasePending = false; this.bassReleasePending = false
+    if (this.initialized) {
+      const transport = Tone.getTransport()
+      if (transport.state === 'started') transport.pause()
+    }
+    this.visualGeneration += 1
+    this.chordTied = false; this.signalTied = false; this.bassTied = false; this.chordReleaseAt = null; this.signalReleaseAt = null; this.bassReleaseAt = null
     for (const source of Object.values(this.sources)) source.release()
   }
   stop(): void {
-    Tone.getTransport().stop(); this.visualGeneration += 1; this.step = 0; this.cycle = 0; this.barIndex = 0
-    this.chordTied = false; this.signalTied = false; this.bassTied = false; this.chordReleasePending = false; this.signalReleasePending = false; this.bassReleasePending = false
+    if (this.initialized) {
+      const transport = Tone.getTransport()
+      if (transport.state !== 'stopped') transport.stop()
+    }
+    this.visualGeneration += 1; this.step = 0; this.cycle = 0; this.barIndex = 0
+    this.chordTied = false; this.signalTied = false; this.bassTied = false; this.chordReleaseAt = null; this.signalReleaseAt = null; this.bassReleaseAt = null
     for (const source of Object.values(this.sources)) source.release()
     const composition = this.callbacks.getComposition()
     this.callbacks.onPosition(-1, composition.activePatternId, 0)
@@ -256,6 +290,7 @@ export class VioletAudioEngine {
   panic(): void { this.stop(); for (const source of Object.values(this.sources)) source.release(); this.heat = 0; this.exhaustion = 0; this.callbacks.onExhaustion(0) }
 
   dispose(): void {
+    this.disposed = true
     this.stop()
     if (this.scheduleId !== null) Tone.getTransport().clear(this.scheduleId)
     this.scheduleId = null

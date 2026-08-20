@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mapLayerCharacter } from './instrumentSource'
+import { engineMonitorTrimDb, mapLayerCharacter, monotonicLiveStartTime, NEUTRAL_VOICE_MODIFIERS } from './instrumentSource'
 
 describe('layered instrument mappings', () => {
   it('keeps FM and AM character mappings bounded', () => {
@@ -21,5 +21,20 @@ describe('layered instrument mappings', () => {
     expect(mapLayerCharacter('pluck', 1)).toEqual({ attackNoise: 2.3, dampening: 6000, resonance: 0.97 })
     expect(mapLayerCharacter('metal', 0)).toEqual({ harmonicity: 2.5, modulationIndex: 12, octaves: 0.5, resonance: 180 })
     expect(mapLayerCharacter('metal', 1)).toEqual({ harmonicity: 6, modulationIndex: 40, octaves: 4, resonance: 3380 })
+  })
+
+  it('calibrates real-time engine monitoring without affecting neutral rendering', () => {
+    expect(engineMonitorTrimDb('fm')).toBe(10)
+    expect(engineMonitorTrimDb('am')).toBe(14)
+    expect(engineMonitorTrimDb('dual')).toBe(-3)
+    expect(engineMonitorTrimDb('metal')).toBe(-6)
+    expect(NEUTRAL_VOICE_MODIFIERS.liveMonitoring).toBe(false)
+  })
+
+  it('keeps late real-time source starts strictly ordered', () => {
+    expect(monotonicLiveStartTime(10.2, 10, 9)).toBe(10.2)
+    const late = monotonicLiveStartTime(9.8, 10, 9.9)
+    expect(late).toBeCloseTo(10.002)
+    expect(monotonicLiveStartTime(9.8, 10, late)).toBeCloseTo(10.003)
   })
 })

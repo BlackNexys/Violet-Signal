@@ -3,10 +3,16 @@ import { EFFECT_SEND_TARGETS, clamp, type EffectSendTarget, type SoundSettings, 
 import { delayFeedback, delayWet, INPUT_GAIN, reverbWet } from './signalPath'
 import { mapFracture, mapVeil } from './soundverse'
 
-export const PARALLEL_DRY_GAIN = 0.78
+export const PARALLEL_DRY_GAIN = 1
 export const SEND_INPUT_TRIM = 0.72
 
 export const effectSendGain = (value: number) => clamp(value, 0, 1) * SEND_INPUT_TRIM
+
+/** Keeps the worst-case unity-send sum at the same level as the former single input path. */
+export function parallelMixInputGain(memory: number, environment: number, veil: number, fracture: number): number {
+  const returnGain = delayWet(memory) + reverbWet(environment) + mapVeil(veil).wet + mapFracture(fracture).wet
+  return INPUT_GAIN / (PARALLEL_DRY_GAIN + SEND_INPUT_TRIM * returnGain)
+}
 
 export interface ParallelEffectRouting {
   mix: Tone.Gain
@@ -33,7 +39,7 @@ export function createParallelEffectRouting(
 ): ParallelEffectRouting {
   const fracture = mapFracture(sound.fracture)
   const veil = mapVeil(sound.veil)
-  const mix = new Tone.Gain(INPUT_GAIN)
+  const mix = new Tone.Gain(parallelMixInputGain(sound.memory, sound.environment, sound.veil, sound.fracture))
   const drive = new Tone.Distortion({ distortion: driveAmount, oversample: '2x' })
   const output = new Tone.Volume(outputDb).connect(destination)
   mix.chain(drive, output)
@@ -88,6 +94,7 @@ export function updateParallelEffectRouting(
   const fracture = mapFracture(sound.fracture)
   const veil = mapVeil(sound.veil)
   routing.drive.distortion = driveAmount
+  routing.mix.gain.rampTo(parallelMixInputGain(sound.memory, sound.environment, sound.veil, sound.fracture), 0.1)
   routing.returns.fracture.gain.rampTo(fracture.wet, 0.1)
   routing.crusher.bits.rampTo(fracture.bits, 0.1)
   routing.returns.veil.gain.rampTo(veil.wet, 0.12)
@@ -105,6 +112,7 @@ export function automateParallelEffectRouting(
   memory: number,
   veil: number,
   fracture: number,
+  environment: number,
   freeze: boolean,
 ): void {
   const fractureMapping = mapFracture(fracture)
@@ -113,6 +121,7 @@ export function automateParallelEffectRouting(
   routing.returns.veil.gain.rampTo(mapVeil(veil).wet, 0.04)
   routing.returns.memory.gain.rampTo(delayWet(memory), 0.04)
   routing.delay.feedback.rampTo(freeze ? 0.82 : delayFeedback(memory), 0.04)
+  routing.mix.gain.rampTo(parallelMixInputGain(memory, environment, veil, fracture), 0.04)
 }
 
 export function setParallelEffectRoutingAtTime(
@@ -120,6 +129,7 @@ export function setParallelEffectRoutingAtTime(
   memory: number,
   veil: number,
   fracture: number,
+  environment: number,
   time: number,
 ): void {
   const fractureMapping = mapFracture(fracture)
@@ -128,6 +138,7 @@ export function setParallelEffectRoutingAtTime(
   routing.returns.veil.gain.setValueAtTime(mapVeil(veil).wet, time)
   routing.returns.memory.gain.setValueAtTime(delayWet(memory), time)
   routing.delay.feedback.setValueAtTime(delayFeedback(memory), time)
+  routing.mix.gain.setValueAtTime(parallelMixInputGain(memory, environment, veil, fracture), time)
 }
 
 export function disposeVoiceSendRoute(route: VoiceSendRoute): void {

@@ -4,9 +4,9 @@ import { occurrenceAllowsVoice, occurrenceLayerSelection, resolveArrangementOccu
 import { measurePeak, peakNormalizationGain } from './normalization'
 import { mapOverclock } from './overclock'
 import { advanceFatigue, resolveSequencerStep, type FatigueState } from './sequencing'
-import { LIMITER_CEILING_DB, masterOutputDb } from './signalPath'
+import { LIMITER_CEILING_DB, masterOutputDb, memoryDelaySeconds } from './signalPath'
 import { LayeredVoiceSource } from './instrumentSource'
-import { resolvePitchedLifecycle } from './legato'
+import { resolvePendingRelease, resolvePitchedLifecycle } from './legato'
 import { createParallelEffectRouting, createVoiceSendRoute, setParallelEffectRoutingAtTime } from './effectRouting'
 
 function encodeWav(buffer: AudioBuffer, gain: number): Blob {
@@ -49,18 +49,18 @@ export async function renderCompositionToWav(composition: Composition): Promise<
   const rendered = await Tone.Offline(async () => {
     const mapped = mapOverclock(composition.sound.overclock)
     const limiter = new Tone.Limiter(LIMITER_CEILING_DB).toDestination()
-    const routing = createParallelEffectRouting(composition.sound, mapped.drive, masterOutputDb(composition.masterVolume, mapped.outputTrimDb), secondsPerStep * 3, limiter)
+    const routing = createParallelEffectRouting(composition.sound, mapped.drive, masterOutputDb(composition.masterVolume, mapped.outputTrimDb), memoryDelaySeconds(composition.bpm), limiter)
     await routing.reverb.ready
     const chordVoice = composition.voices.chords
     const chordVolume = new Tone.Volume(chordVoice.volume)
     const chordFilter = new Tone.Filter({ frequency: chordVoice.cutoff, type: chordVoice.filterType, rolloff: -24, Q: chordVoice.resonance }).connect(chordVolume)
     createVoiceSendRoute(chordVolume, routing, chordVoice.sends)
-    const chords = new LayeredVoiceSource('chords', chordFilter, chordVoice, { envelopeScale: mapped.envelopeScale, pitchDriftCents: mapped.pitchDriftCents })
+    const chords = new LayeredVoiceSource('chords', chordFilter, chordVoice, { envelopeScale: mapped.envelopeScale, pitchDriftCents: mapped.pitchDriftCents, liveMonitoring: false })
     const signalVoice = composition.voices.signal
     const signalVolume = new Tone.Volume(signalVoice.volume)
     const signalFilter = new Tone.Filter({ frequency: signalVoice.cutoff, type: signalVoice.filterType, rolloff: -24, Q: signalVoice.resonance }).connect(signalVolume)
     createVoiceSendRoute(signalVolume, routing, signalVoice.sends)
-    const signal = new LayeredVoiceSource('signal', signalFilter, signalVoice, { envelopeScale: mapped.envelopeScale, pitchDriftCents: mapped.pitchDriftCents })
+    const signal = new LayeredVoiceSource('signal', signalFilter, signalVoice, { envelopeScale: mapped.envelopeScale, pitchDriftCents: mapped.pitchDriftCents, liveMonitoring: false })
     const bassVoice = composition.voices.bass
     const bassVolume = new Tone.Volume(bassVoice.volume)
     const bassFilter = new Tone.Filter({ frequency: bassVoice.cutoff, type: bassVoice.filterType, rolloff: -24, Q: bassVoice.resonance }).connect(bassVolume)
@@ -81,9 +81,9 @@ export async function renderCompositionToWav(composition: Composition): Promise<
     let chordTied = false
     let signalTied = false
     let bassTied = false
-    let chordReleasePending = false
-    let signalReleasePending = false
-    let bassReleasePending = false
+    let chordReleaseAt: number | null = null
+    let signalReleaseAt: number | null = null
+    let bassReleaseAt: number | null = null
     let fatigue: FatigueState = { heat: 0, exhaustion: 0 }
     let stepCursor = 0
     composition.arrangement.forEach((_, bar) => {
@@ -95,11 +95,12 @@ export async function renderCompositionToWav(composition: Composition): Promise<
         const ratchetSpacing = secondsPerStep / resolved.ratchets
         const triggerTimes = Array.from({ length: resolved.ratchets }, (_, ratchet) => eventTime + ratchet * ratchetSpacing)
         chordFilter.frequency.setValueAtTime(clamp(resolved.mask * resolved.mapped.brightness, 80, 12000), time)
-        setParallelEffectRoutingAtTime(routing, resolved.memory, resolved.veil, resolved.fracture, time)
+        setParallelEffectRoutingAtTime(routing, resolved.memory, resolved.veil, resolved.fracture, composition.sound.environment, time)
         const chordAllowed = occurrenceAllowsVoice(composition, occurrence, 'chords')
         const chordCanSound = step.notes.length > 0 && resolved.shouldPlay && chordAllowed
-        if (chordReleasePending) chords.release(chordCanSound ? eventTime : time)
-        chordReleasePending = false
+        const chordPending = resolvePendingRelease(chordReleaseAt, time, chordCanSound ? eventTime : null)
+        if (chordPending.releaseTime !== null) chords.release(chordPending.releaseTime)
+        chordReleaseAt = chordPending.pendingAt
         const chordLifecycle = resolvePitchedLifecycle(chordTied, chordCanSound, step.chordTie, resolved.ratchets)
         if (chordLifecycle.releasePrevious) chords.release(chordCanSound ? eventTime : time)
         if (step.notes.length && resolved.shouldPlay && chordAllowed) lastChord = [...step.notes]
@@ -112,7 +113,7 @@ export async function renderCompositionToWav(composition: Composition): Promise<
           if (chordLifecycle.mode === 'attack') chords.attack(chord, eventTime, velocity, selection)
           else if (chordLifecycle.mode === 'change') {
             chords.change(chord, eventTime, velocity, selection)
-            if (!chordLifecycle.held) chordReleasePending = true
+            if (!chordLifecycle.held) chordReleaseAt = eventTime + intendedDuration
           } else for (const triggerTime of triggerTimes) chords.trigger(chord, noteDuration, triggerTime, velocity, selection)
         } else if (resolved.shouldPlay && chordAllowed && resolved.isGhostChord) {
           const chord = transposeOccurrenceNotes(lastChord, occurrence)
@@ -122,8 +123,9 @@ export async function renderCompositionToWav(composition: Composition): Promise<
 
         const signalAllowed = occurrenceAllowsVoice(composition, occurrence, 'signal')
         const signalCanSound = Boolean(step.signal) && resolved.shouldPlay && signalAllowed
-        if (signalReleasePending) signal.release(signalCanSound ? eventTime : time)
-        signalReleasePending = false
+        const signalPending = resolvePendingRelease(signalReleaseAt, time, signalCanSound ? eventTime : null)
+        if (signalPending.releaseTime !== null) signal.release(signalPending.releaseTime)
+        signalReleaseAt = signalPending.pendingAt
         const signalLifecycle = resolvePitchedLifecycle(signalTied, signalCanSound, step.signalTie, resolved.ratchets)
         if (signalLifecycle.releasePrevious) signal.release(signalCanSound ? eventTime : time)
         if (signalCanSound && step.signal) {
@@ -135,15 +137,16 @@ export async function renderCompositionToWav(composition: Composition): Promise<
           if (signalLifecycle.mode === 'attack') signal.attack(signalNote, eventTime, velocity, selection)
           else if (signalLifecycle.mode === 'change') {
             signal.change(signalNote, eventTime, velocity, selection)
-            if (!signalLifecycle.held) signalReleasePending = true
+            if (!signalLifecycle.held) signalReleaseAt = eventTime + intendedDuration
           } else for (const triggerTime of triggerTimes) signal.trigger(signalNote, noteDuration, triggerTime, velocity, selection)
         }
         signalTied = signalLifecycle.held
 
         const bassAllowed = occurrenceAllowsVoice(composition, occurrence, 'bass')
         const bassCanSound = Boolean(step.bass) && resolved.shouldPlay && bassAllowed
-        if (bassReleasePending) bass.release(bassCanSound ? eventTime : time)
-        bassReleasePending = false
+        const bassPending = resolvePendingRelease(bassReleaseAt, time, bassCanSound ? eventTime : null)
+        if (bassPending.releaseTime !== null) bass.release(bassPending.releaseTime)
+        bassReleaseAt = bassPending.pendingAt
         const bassLifecycle = resolvePitchedLifecycle(bassTied, bassCanSound, step.bassTie, resolved.ratchets)
         if (bassLifecycle.releasePrevious) bass.release(bassCanSound ? eventTime : time)
         if (bassCanSound && step.bass) {
@@ -155,7 +158,7 @@ export async function renderCompositionToWav(composition: Composition): Promise<
           if (bassLifecycle.mode === 'attack') bass.attack(bassNote, eventTime, velocity, selection)
           else if (bassLifecycle.mode === 'change') {
             bass.change(bassNote, eventTime, velocity, selection)
-            if (!bassLifecycle.held) bassReleasePending = true
+            if (!bassLifecycle.held) bassReleaseAt = eventTime + intendedDuration
           } else for (const triggerTime of triggerTimes) bass.trigger(bassNote, noteDuration, triggerTime, velocity, selection)
         }
         bassTied = bassLifecycle.held

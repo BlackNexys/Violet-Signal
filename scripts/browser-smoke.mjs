@@ -116,8 +116,23 @@ try {
   expect((await tempoLine.innerText()).trim() === 'tempo: 101', `editor caret moved during correction: ${await tempoLine.innerText()}`)
 
   const enableAudio = page.getByRole('button', { name: 'Enable audio' })
-  if (await enableAudio.count()) await enableAudio.click()
-  await page.getByText('Audio ready').waitFor()
+  if (await enableAudio.count()) {
+    await page.evaluate(() => {
+      const buttons = [...document.querySelectorAll('button')]
+      buttons.find((button) => button.textContent?.includes('Enable audio'))?.click()
+      buttons.find((button) => button.getAttribute('aria-label') === 'Play')?.click()
+      buttons.find((button) => button.getAttribute('aria-label') === 'Stop and return to step one')?.click()
+    })
+    await page.getByText('Audio ready').waitFor()
+    await page.waitForTimeout(100)
+    expect(await page.getByRole('button', { name: 'Play', exact: true }).isVisible(), 'Stop did not cancel Play while audio was initializing')
+  }
+  await page.getByRole('button', { name: 'Play', exact: true }).click()
+  await page.getByRole('button', { name: 'Pause' }).waitFor()
+  await page.getByRole('button', { name: 'Pause' }).click()
+  await page.getByRole('button', { name: 'Play', exact: true }).click()
+  await page.getByRole('button', { name: 'Pause' }).waitFor()
+  await page.getByRole('button', { name: 'Stop and return to step one' }).click()
   await page.getByRole('button', { name: 'Play', exact: true }).click()
   await page.getByRole('button', { name: 'Pause' }).waitFor()
   const loopTiming = await page.evaluate(() => new Promise((resolve, reject) => {
