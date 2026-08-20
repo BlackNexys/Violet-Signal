@@ -1,6 +1,6 @@
 # Instrument Sound and Layer Expansion Plan
 
-Status: in progress — 9 of 10 delivery steps completed; per-voice effect sends shipped
+Status: completed — all 10 delivery steps shipped
 Date: 2026-08-19  
 Last planning update: 2026-08-20
 Last implementation update: 2026-08-20
@@ -15,7 +15,7 @@ The first vertical slice is implemented:
 - Patch selection, editable layer controls, Custom provenance, undo/redo, and queued playback-boundary application.
 - Safe notation, CodeMirror support, IndexedDB/project normalization, documentation, and production-browser layered WAV coverage.
 
-The headless CLI is implemented with validation, formatting, and production-path WAV rendering. Format v3 arrangement occurrences provide transpose, whole-memory rotation, per-voice mute, Primary/Shadow selection, and bounded effect modifiers. Dorian, Phrygian, harmonic minor, melodic minor, and pentatonic share one interval registry across notation, keyboard choices, and chord suggestions. Dual and metal sources plus a bounded managed pluck pool run through the shared live/offline adapter; Chrome Wound and the first Fractured Relay patches exercise them in production-browser WAV coverage. Hold/Linear automation shares one circular resolver across lane previews, live playback, offline WAV rendering, and occurrence effects. Explicit Chord/Bass ties use shared attack, pitch-change, and release lifecycles across live and offline rendering. Per-voice Fracture, Veil, Memory, and Environment sends now feed a shared parallel graph built by the same live/offline routing factory. The remaining roadmap step is the product checkpoint for an optional Signal voice.
+The headless CLI is implemented with validation, formatting, and production-path WAV rendering. Format v3 arrangement occurrences provide transpose, whole-memory rotation, per-voice mute, Primary/Shadow selection, and bounded effect modifiers. Dorian, Phrygian, harmonic minor, melodic minor, and pentatonic share one interval registry across notation, keyboard choices, and chord suggestions. Dual and metal sources plus a bounded managed pluck pool run through the shared live/offline adapter; Chrome Wound and Fractured Relay patches exercise them in production-browser WAV coverage. Hold/Linear automation shares one circular resolver across lane previews, live playback, offline WAV rendering, and occurrence effects. Explicit Chord/Signal/Bass ties use shared attack, pitch-change, and release lifecycles across live and offline rendering. Per-voice Fracture, Veil, Memory, and Environment sends feed a shared parallel graph built by the same live/offline routing factory. Format v4 completes the roadmap with a fifth monophonic Signal voice, an independent opt-in note lane, three built-in patches, full occurrence controls, and live/offline parity.
 
 ## Post-v2 feedback roadmap
 
@@ -31,7 +31,7 @@ The adopted priorities are:
 | 4 | Complete `dual`, `metal`, and `pluck` engines | Fulfils the sound-expansion vocabulary, especially short plucked articulation | Profile polyphony and offline parity first |
 | 5 | Interpolated automation and real ties | Adds motion and expressive glide | Requires shared automation and source-lifecycle semantics |
 | 6 | Per-voice effect sends | Makes layers occupy different depths without duplicating processors | Requires a parallel-bus graph rather than fields on the current serial chain |
-| 7 | Optional fifth melodic Signal voice | Adds a dedicated lead role | Cross-cuts voice records, notation, UI, scheduling, and rendering; defer until the preceding models settle |
+| 7 | Fifth melodic Signal voice | Adds a dedicated lead role | Completed after the preceding models settled; format v4 migration keeps its lane empty |
 
 ### Guiding decisions
 
@@ -114,7 +114,7 @@ pattern data and automation
 
 Initial implementation scope:
 
-1. Transpose pitch-bearing Chord and Bass events by bounded semitones.
+1. Transpose pitch-bearing Chord, Signal, and Bass events by bounded semitones.
 2. Mute any voice for one occurrence without changing its pattern or global voice state.
 3. Select all, Primary-only, or Shadow-only output for a voice in one occurrence.
 4. Add rotation after its precise semantics are tested. **Completed.**
@@ -140,7 +140,7 @@ The chosen grammar provides:
 - canonical formatting;
 - room for layer selection and effect modifiers without making one line opaque.
 
-Neutral occurrences remain bare letters. Canonical formatting orders fields as transpose, rotate, mute, layers, then effects; voice lists use Chord, Bass, Pulse, Texture order and effect lists use Mask, Memory, Veil, Fracture, Ghost, Overclock order. Rotation accepts `-63..63` whole steps. Mask is a `0.25..4` multiplier; the other effect values are `-1..1` offsets applied after pattern automation.
+Neutral occurrences remain bare letters. Canonical formatting orders fields as transpose, rotate, mute, layers, then effects; format-v4 voice lists use Chord, Signal, Bass, Pulse, Texture order and effect lists use Mask, Memory, Veil, Fracture, Ghost, Overclock order. Rotation accepts `-63..63` whole steps. Mask is a `0.25..4` multiplier; the other effect values are `-1..1` offsets applied after pattern automation.
 
 Exit criteria:
 
@@ -173,7 +173,7 @@ Add Dorian, Phrygian, harmonic minor, melodic minor, and pentatonic modes while 
 
 Resume the sound-engine profiling gate for:
 
-- `dual` for wide detuned Chord and Bass patches;
+- `dual` for wide detuned Chord, Signal, and Bass patches;
 - `metal` for Pulse and Texture transients;
 - `pluck`, with managed polyphony and lifecycle tests, as the most compositionally important addition.
 
@@ -207,15 +207,17 @@ voice channels -> dry bus ---------------------------------> output
               -> Environment --> shared Environment return-|
 ```
 
-Global effect controls continue to shape the shared processors and returns; per-voice send values control how much Chord, Bass, Pulse, and Texture enter each processor. Missing legacy sends normalize to `1`, preserving the intent that every voice reaches every processor. A `0.78` dry trim, `0.72` send-input trim, existing input trim, and final limiter protect the parallel sum. Drive moved after the recombined returns, so this retains routing intent rather than attempting to reproduce every interaction from the former serial chain.
+Global effect controls continue to shape the shared processors and returns; per-voice send values control how much Chord, Signal, Bass, Pulse, and Texture enter each processor. Missing sends on legacy voices normalize to `1`, while the new Signal role uses a calibrated depth map. A `0.78` dry trim, `0.72` send-input trim, existing input trim, and final limiter protect the parallel sum. Drive moved after the recombined returns, so this retains routing intent rather than attempting to reproduce every interaction from the former serial chain.
 
 One routing factory now instantiates the graph for live playback and offline WAV rendering. The Instrument exposes the sends as the selected voice's **Depth** controls, canonical notation writes `send-fracture`, `send-veil`, `send-memory`, and `send-environment`, and sound-patch selection preserves these routing choices. Unit, production build, live browser, and offline-WAV coverage validate gain staging, feedback safety, mute/solo behavior, automation, disposal, and renderer parity.
 
-## Deferred expansion — Optional Signal voice
+## Milestone G — Signal voice
 
-A fifth melodic `signal` voice remains a valid future direction for leads and counter-lines, but it is deliberately deferred. The current four-role union is embedded in records, styles, notation, instrument UI, engine construction, offline rendering, and tests. Adding Signal after occurrence transforms and routing settle avoids multiplying both migrations at once.
+Status: completed 2026-08-20.
 
-Its design checkpoint must decide whether Signal receives its own pattern lane, shares a pitched pattern representation, and participates in every existing style by default or only when authored.
+Signal receives its own monophonic pattern lane with the same `1`, `2`, `3`, `4`, and `8` step gates and explicit `>` tie lifecycle as Bass. It supports subtractive, FM, AM, dual, and managed-pluck sources; Primary/Shadow layers; Glide; mute/solo; occurrence transpose, mute, and layer focus; per-voice effect sends; live audition; recording; and deterministic offline WAV rendering.
+
+Format v4 is the compatibility boundary. v1–v3 compositions normalize a calibrated Signal channel plus an empty Signal event on every step, so their sound is unchanged. Existing Style recipes neither generate Signal phrases nor overwrite an authored one. Signal therefore participates only when explicitly authored. Carrier Line, Cold Beacon, and Needle Light seed the role across Blacklight Core, Veil Archive, and Fractured Relay.
 
 ## Revised delivery sequence
 
@@ -228,22 +230,22 @@ Its design checkpoint must decide whether Signal receives its own pattern lane, 
 7. **Completed:** Add Hold/Linear automation interpolation.
 8. **Completed:** Add true ties and legato source lifecycles.
 9. **Completed:** Refactor the effect graph and expose per-voice sends.
-10. Reassess the optional Signal voice using real composition feedback from the preceding features.
+10. **Completed:** Add the format-v4 Signal voice after validating an independent, opt-in lane against the settled models.
 
 ## Outcome
 
-Expand Violet Signal from four fixed synth voices into four richer, layered instruments without changing the sequencer's beginner-friendly mental model.
+Expand Violet Signal from four fixed synth voices into five richer, layered instruments while keeping the sequencer's mental model bounded and beginner-friendly.
 
 The recommended design is:
 
-- Keep the existing **Chord, Bass, Pulse, and Texture** lanes.
+- Keep the existing **Chord, Bass, Pulse, and Texture** lanes and add one explicit monophonic **Signal** lead lane after the shared models settle.
 - Give each voice a **Primary** layer and one optional **Shadow** layer.
 - Add a small set of synthesis engines already available in the installed `tone` package.
 - Package authored combinations as versioned, built-in **sound packs** that fit the Blacklight theme.
 - Keep every concrete sound setting serialized so a saved composition does not change when a pack evolves.
 - Preserve deterministic playback, old project compatibility, and live/offline WAV parity.
 
-This creates meaningfully deeper sound without turning Violet Signal into a full DAW or adding more sequencer lanes.
+This creates meaningfully deeper sound without turning Violet Signal into a full DAW; Signal is the one deliberately scoped lane expansion.
 
 ## Why this direction fits the current app
 
@@ -251,19 +253,19 @@ The repository already has a broad musical vocabulary, but a narrow synthesis vo
 
 | Area | Current state | Consequence |
 | --- | --- | --- |
-| Musical lanes | Four semantic voices: Chord, Bass, Pulse, Texture | The workflow is understandable and worth preserving. |
+| Musical lanes | Five semantic voices: Chord, Signal, Bass, Pulse, Texture | Signal adds a clear lead role without arbitrary track creation. |
 | Sound sources | One Tone.js instrument per lane | Styles can change parameters, but often retain a similar underlying timbre. |
 | Oscillators | Sine, triangle, square, saw; Texture maps these to noise colors | Useful fundamentals, but not enough for clearly distinct instruments. |
 | Effects | Drive, bit reduction, chorus, delay, generated reverb, limiter | The shared Blacklight character is already strong. |
 | Style recipes | 19 built-in genre/style recipes | Styles are broad enough; deeper source sounds will make them more convincing. |
 | Rendering | Separate live and offline graphs with shared pure mappings | New sources must be implemented in both paths or extracted into shared builders. |
-| Notation | Four explicit `voice` lines using bounded values | New sound data must remain safe, readable, and backward compatible. |
+| Notation | Five explicit `voice` lines using bounded values | New sound data must remain safe, readable, and backward compatible. |
 
 Relevant implementation seams are `src/model/composition.ts`, `src/model/styles.ts`, `src/audio/engine.ts`, `src/audio/offlineRender.ts`, `src/dsl/parser.ts`, `src/dsl/serializer.ts`, and `src/components/InstrumentPanel.tsx`.
 
 ## Product principles
 
-1. **More depth, not more lanes.** Existing notes and steps should trigger richer instruments without requiring a larger sequencer.
+1. **Bounded depth before breadth.** Existing notes and steps trigger richer instruments; the later Signal lane is one explicit lead role, not an arbitrary track system.
 2. **Two layers are enough.** A fixed Primary/Shadow pair is expressive, explainable, and bounded for CPU use.
 3. **Patches are starting points, not locks.** Applying a sound changes explicit settings that remain editable.
 4. **Theme in names, clarity in labels.** “Glass Choir” may be the patch name; “wide AM pad” explains what it does.
@@ -273,17 +275,17 @@ Relevant implementation seams are `src/model/composition.ts`, `src/model/styles.
 
 ## Proposed sound model
 
-### Keep the four musical roles
+### Keep the original roles and add one bounded lead
 
-No new step lanes are required. Chord and Bass retain pitched events; Pulse and Texture retain hit events.
+The original two-layer slice required no new step lanes. The later format-v4 milestone adds one deliberately bounded monophonic Signal lane; Chord remains polyphonic, Signal and Bass are mono, and Pulse and Texture retain hit events.
 
 ```text
 Sequencer event
-    -> Voice (Chord / Bass / Pulse / Texture)
+    -> Voice (Chord / Signal / Bass / Pulse / Texture)
         -> Primary layer
         -> optional Shadow layer
     -> shared voice filter and level
-    -> Drive -> Fracture -> Veil -> Memory -> Environment -> Limiter
+    -> dry + four per-voice sends -> shared parallel returns -> Drive -> Limiter
 ```
 
 Mute, solo, automation, the voice filter, and the voice level continue to operate at voice/channel level. Layer controls define how the sound is generated before it enters that channel.
@@ -303,11 +305,11 @@ Use engine capabilities already shipped by Tone.js 15.1.22. The UI should show t
 
 | Engine id | UI label | Tone building block | Compatible roles | Character |
 | --- | --- | --- | --- | --- |
-| `subtractive` | Signal — classic synth | `Synth` / `MonoSynth` | Chord, Bass | Familiar analog-like base; migration default. |
-| `fm` | Specter — FM | `FMSynth` | Chord, Bass | Bells, glass, growl, and digital edge. |
-| `am` | Halo — AM | `AMSynth` | Chord, Bass | Hollow, vocal, and slowly moving tones. |
-| `dual` | Twin — dual oscillator | `DuoSynth` | Chord, Bass | Wide detuned stacks and unstable unison. |
-| `pluck` | Wire — physical pluck | `PluckSynth` or a small managed voice pool | Chord, Bass | Short wire, string, and picked transients. |
+| `subtractive` | Signal — classic synth | `Synth` / `MonoSynth` | Chord, Signal, Bass | Familiar analog-like base; migration default. |
+| `fm` | Specter — FM | `FMSynth` | Chord, Signal, Bass | Bells, glass, growl, and digital edge. |
+| `am` | Halo — AM | `AMSynth` | Chord, Signal, Bass | Hollow, vocal, and slowly moving tones. |
+| `dual` | Twin — dual oscillator | `DuoSynth` | Chord, Signal, Bass | Wide detuned stacks and unstable unison. |
+| `pluck` | Wire — physical pluck | `PluckSynth` or a small managed voice pool | Chord, Signal, Bass | Short wire, string, and picked transients. |
 | `membrane` | Impact — membrane | `MembraneSynth` | Pulse | Current kick/tom foundation. |
 | `metal` | Shard — metallic | `MetalSynth` | Pulse, Texture | Hats, clangs, relays, and industrial accents. |
 | `noise` | Weather — noise | `NoiseSynth` | Pulse, Texture | Brown, pink, or white noise bodies. |
@@ -408,13 +410,13 @@ Stable identity can use `pack-id/patch-id@version`. Applying a patch copies its 
 
 The names carry atmosphere; each UI entry must also include the plain-language descriptor shown here.
 
-| Pack | Chord patch | Bass patch | Pulse patch | Texture patch |
-| --- | --- | --- | --- | --- |
-| **Blacklight Core** | Quiet Circuit — classic poly synth | Underline — mono synth | Heart Signal — membrane hit | Rain Carrier — filtered noise |
-| **Veil Archive** | Glass Choir — AM/FM pad | Undertow — sine/FM sub | Ritual Knock — deep layered membrane | Wet Glass — pink/brown noise wash |
-| **Chrome Wound** | Razor Assembly — detuned dual saw | Reactor — FM/subtractive growl | Iron Pulse — membrane and metallic attack | Arc Ash — bright metallic/noise debris |
-| **Fractured Relay** | Bit Apparition — square/FM keys | Wire Below — short physical pluck | Relay Click — clipped metal transient | Data Dust — gated white-noise fragments |
-| **Low Cinema** | Eclipse Bloom — slow dual/AM pad | Low Omen — layered sine drone | Distant Impact — softened membrane boom | Black Snow — long dark noise bed |
+| Pack | Chord patch | Signal patch | Bass patch | Pulse patch | Texture patch |
+| --- | --- | --- | --- | --- | --- |
+| **Blacklight Core** | Quiet Circuit — classic poly synth | Carrier Line — gliding mono lead | Underline — mono synth | Heart Signal — membrane hit | Rain Carrier — filtered noise |
+| **Veil Archive** | Glass Choir — AM/FM pad | Cold Beacon — glassy AM/FM lead | Undertow — sine/FM sub | Ritual Knock — deep layered membrane | Wet Glass — pink/brown noise wash |
+| **Chrome Wound** | Razor Assembly — detuned dual saw | — | Reactor — FM/subtractive growl | Iron Pulse — membrane and metallic attack | Arc Ash — bright metallic/noise debris |
+| **Fractured Relay** | Bit Apparition — square/FM keys | Needle Light — physical-string lead | Wire Below — short physical pluck | Relay Click — clipped metal transient | Data Dust — gated white-noise fragments |
+| **Low Cinema** | Eclipse Bloom — slow dual/AM pad | — | Low Omen — layered sine drone | Distant Impact — softened membrane boom | Black Snow — long dark noise bed |
 
 The initial delivery should include **Blacklight Core**, **Veil Archive**, and **Chrome Wound**: four migrated patches plus eight genuinely new patches. Fractured Relay and Low Cinema form the second content slice after performance and live/offline parity are proven.
 
@@ -666,7 +668,7 @@ Exit: twenty total built-in patches, backward compatibility, accessible UI, and 
 
 ## Decisions made by this plan
 
-- Keep four sequencer lanes.
+- Keep five fixed sequencer lanes, including the opt-in Signal lead; do not add arbitrary tracks.
 - Use two layers per voice, not arbitrary layer counts.
 - Use Tone.js engines already installed; add no new runtime package initially.
 - Remain synthesized/procedural and sample-free for this milestone.
@@ -677,7 +679,7 @@ Exit: twenty total built-in patches, backward compatibility, accessible UI, and 
 
 ## Deliberate non-goals
 
-- Additional sequencer tracks or a mixer with arbitrary channels.
+- Additional sequencer tracks beyond Signal or a mixer with arbitrary channels.
 - User-uploaded samples, remote sample libraries, or Tone `Sampler` presets.
 - Third-party sound-pack import in the first release.
 - Arbitrary modulation routing or a modular patching canvas.

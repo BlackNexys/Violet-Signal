@@ -26,7 +26,7 @@ A scene begins with a quoted name, contains `control: value` lines, and ends wit
 
 ```text
 scene "Your Scene Name" {
-  format-version: 3
+  format-version: 4
   style: darkwave
   style-version: 1
   influences: ambient=0.2
@@ -64,7 +64,7 @@ For example, in 4/4 steps `01 05 09 13` are the four quarter-note downbeats. Ste
 
 | Control | Accepted value | Meaning |
 | --- | --- | --- |
-| `format-version` | Whole number `1`–`3` | Composition schema. The app currently writes `3`; missing values import as legacy v1. |
+| `format-version` | Whole number `1`–`4` | Composition schema. The app currently writes `4`; missing values import as legacy v1. v4 adds the optional Signal lane. |
 | `style` | Any built-in style id | Primary production vocabulary. `world` remains accepted for older projects. |
 | `style-version` | Whole number `1`–`999` | Recipe schema version written by the app; normally leave it unchanged. |
 | `influences` | `style-id=0..0.8`, or `none` | Optional secondary style blend; the Style Lab currently writes one influence. |
@@ -92,20 +92,20 @@ arrangement: A A[transpose=12,rotate=-3] B[mute=pulse+texture,effects=veil:0.2+f
 
 Inside the brackets, comma-separated settings have a fixed meaning:
 
-- `transpose` is a whole number from `-24` to `24` semitones and affects Chord and Bass notes only.
+- `transpose` is a whole number from `-24` to `24` semitones and affects Chord, Signal, and Bass notes only.
 - `rotate` is a whole number from `-63` to `63`; positive values move the final steps to the front. It rotates events, expression data, and every automation lane together.
-- `mute` lists one or more voices joined by `+`: `chords`, `bass`, `pulse`, or `texture`.
+- `mute` lists one or more voices joined by `+`: `chords`, `signal`, `bass`, `pulse`, or `texture`.
 - `layers` lists `voice:all`, `voice:primary`, or `voice:shadow` assignments joined by `+`.
 - `shadow` explicitly plays the configured Shadow for that occurrence even when its normal enabled switch is off. `all` follows the normal Shadow enabled state.
 - `effects` joins `target:value` modifiers with `+`. `mask` is a `0.25`–`4` multiplier; `memory`, `veil`, `fracture`, `ghost`, and `overclock` are `-1`–`1` offsets.
 
-Canonical formatting orders settings as `transpose`, `rotate`, `mute`, `layers`, then `effects`; voices use Chord, Bass, Pulse, Texture order and effects use Mask, Memory, Veil, Fracture, Ghost, Overclock order. Pattern automation resolves first, occurrence effect modifiers resolve afterward, performance gestures follow, and final audio safety mapping remains last. Rotation is virtual and never rewrites the source pattern.
+Canonical formatting orders settings as `transpose`, `rotate`, `mute`, `layers`, then `effects`; voices use Chord, Signal, Bass, Pulse, Texture order and effects use Mask, Memory, Veil, Fracture, Ghost, Overclock order. Pattern automation resolves first, occurrence effect modifiers resolve afterward, performance gestures follow, and final audio safety mapping remains last. Rotation is virtual and never rewrites the source pattern.
 
 WAV export reproduces the written gain staging and effects, then peak-normalizes the completed file to `−1 dBFS`. The `output` value still changes how strongly the signal reaches the drive/limiter stages, but it no longer leaves an otherwise healthy export unnecessarily quiet. Peak normalization is not commercial loudness mastering.
 
 ## Voice configuration
 
-There are four voices: `chords`, `bass`, `pulse`, and `texture`. Each has a required Primary layer and an optional Shadow layer. A voice line configures the Primary source and its shared channel; a `layer … shadow` line configures the second source. Old voice lines remain valid and receive the role's original engine with Shadow off.
+There are five voices: `chords`, `signal`, `bass`, `pulse`, and `texture`. Signal is an independent monophonic lead; it is empty in migrated projects and is never generated implicitly by existing Style recipes. Each voice has a required Primary layer and an optional Shadow layer. A voice line configures the Primary source and its shared channel; a `layer … shadow` line configures the second source. Old voice lines remain valid and receive the role's original engine with Shadow off.
 
 ```text
 patch chords: veil-archive/glass-choir@1
@@ -118,7 +118,7 @@ layer chords shadow: on engine=fm waveform=sine octave=1 detune=7 level=-17 char
 | Setting | Accepted value | Meaning |
 | --- | --- | --- |
 | First token | `sine`, `triangle`, `square`, or `sawtooth` | Primary waveform. Noise engines map these choices to procedural noise colors. |
-| `engine` | Chord/Bass: `subtractive`, `fm`, `am`, `dual`, `pluck`; Pulse: `membrane`, `metal`, `noise`; Texture: `metal`, `noise` | Bounded synthesis model compatible with that voice. |
+| `engine` | Chord/Signal/Bass: `subtractive`, `fm`, `am`, `dual`, `pluck`; Pulse: `membrane`, `metal`, `noise`; Texture: `metal`, `noise` | Bounded synthesis model compatible with that voice. |
 | `octave` | Whole number `-2`–`2` | Primary pitch shift without editing written notes. |
 | `layer-level` | `-36`–`0` | Primary source level before the voice channel. |
 | `character` | `0`–`1` | Engine-specific tone macro. |
@@ -168,12 +168,13 @@ output: -12
 
 These values shape each shared processor and its return strength; the four `send-*` values on a voice determine how much of that voice enters it. For controlled results, change one control at a time. High Memory or Environment can make one bar overlap the next; that is an effect tail, not a transport delay.
 
-## Writing notes and chords
+## Writing Chord, Signal, and Bass notes
 
-Chord and bass lanes use sparse `step=value` assignments.
+Chord, Signal, and Bass lanes use sparse `step=value` assignments.
 
 ```text
 notes A: 01=C4+Eb4+G4> 02=D4+F4+A4 09=Ab3+C4+Eb4~4
+signal A: 03=G4> 04=Ab4 11=Eb5~2
 bass A: 01=C2> 02=D2 09=Ab1~4
 ```
 
@@ -182,13 +183,13 @@ bass A: 01=C2> 02=D2 09=Ab1~4
 - Add `~1`, `~2`, `~3`, `~4`, or `~8` to hold the event for that many steps.
 - Add `>` after the optional length to tie the event into the immediately following step: `01=C2>` or `01=C2~2>`.
 - Without `~length`, the event lasts one step.
-- Bass accepts one pitch per assignment; chords accept one or more pitches.
+- Signal and Bass accept one pitch per assignment; Chords accept one or more pitches.
 - Note names use an uppercase letter, an optional `#` or `b`, and an octave: `C4`, `Eb4`, `F#3`.
 - Use `none` for an empty lane.
 
 A tie is an outgoing connection, so the following step must contain an authored event in the same lane. Repeat the pitch when it should remain steady, or write a new pitch for legato movement. Every connected step except the last needs `>`. Ties continue across pattern and occurrence boundaries during playback; the final offline occurrence releases at the written arrangement end.
 
-Rests, occurrence/global mute, failed Chance, Ghost substitution, and Ratchet values above one break a tie safely. Stop, Pause, Panic, engine replacement, or disabling a selected Shadow cannot leave a held source behind. Gate length applies to ordinary triggers; the explicit tie lifecycle controls connected events. Bass subtractive/FM/AM/dual sources use Glide when changing pitch. Chords retain common pitches while changed voices exchange, and physical-pluck sources re-excite pitches that cannot be repitched continuously.
+Rests, occurrence/global mute, failed Chance, Ghost substitution, and Ratchet values above one break a tie safely. Stop, Pause, Panic, engine replacement, or disabling a selected Shadow cannot leave a held source behind. Gate length applies to ordinary triggers; the explicit tie lifecycle controls connected events. Signal and Bass subtractive/FM/AM/dual sources use Glide when changing pitch. Chords retain common pitches while changed voices exchange, and physical-pluck sources re-excite pitches that cannot be repitched continuously.
 
 Assignments on the same line are separated by spaces. Do not use commas.
 
@@ -260,6 +261,7 @@ scene "Neon Séance" {
   active: A
   arrangement: A A B A
   voice chords: triangle volume=-11 cutoff=2100 attack=0.12 decay=0.7 sustain=0.66 release=2.4 mute=off solo=off
+  voice signal: sawtooth volume=-16 cutoff=4200 attack=0.015 decay=0.24 sustain=0.46 release=0.55 glide=0.06 mute=off solo=off
   voice bass: sawtooth volume=-10 cutoff=680 attack=0.012 decay=0.35 sustain=0.5 release=0.8 mute=off solo=off
   voice pulse: sine volume=-17 cutoff=1900 attack=0.005 decay=0.1 sustain=0 release=0.06 mute=off solo=off
   voice texture: triangle volume=-24 cutoff=1300 attack=0.1 decay=0.7 sustain=0.1 release=2 mute=off solo=off
@@ -273,6 +275,7 @@ scene "Neon Séance" {
   output: -12
 
   notes A: 01=C4+Eb4+G4~8 09=Ab3+C4+Eb4~8
+  signal A: 03=G4> 04=Ab4 11=Eb5~2
   bass A: 01=C2~4 09=Ab1~4
   pulse A: 01 07 09 15
   texture A: 04 12
@@ -351,7 +354,7 @@ The Style Lab can transform tempo, timing, voices, effects, harmony, patterns, a
 | `needs the form 05=C4~4>` | Put `>` last, after the optional note length. |
 | `understands on or off` | Boolean settings do not accept `true`, `false`, `yes`, or `no`. |
 | `is not a voice setting` | Use the documented Primary/channel settings; put Shadow-only values on a `layer … shadow` line. |
-| `is not available for the … voice` | Choose an engine compatible with Chord/Bass, Pulse, or Texture as listed above. |
+| `is not available for the … voice` | Choose an engine compatible with Chord/Signal/Bass, Pulse, or Texture as listed above. |
 | `is not a layer setting` | Use engine, waveform, octave, detune, level, character, attack-scale, or release-scale. |
 | `not a control in this instrument` | Remove the unknown key or translate it to a supported control. |
 | `scene needs a closing }` | Put one `}` on its own final line. |
@@ -400,7 +403,7 @@ OCCURRENCE    = (A | B | C | D) ["[" OCCURRENCE_OPTION ["," OCCURRENCE_OPTION...
 OCCURRENCE_OPTION = transpose | rotate | mute | layers | effects
 transpose     = integer -24..24
 rotate        = integer -63..63
-mute          = chords | bass | pulse | texture, joined by +
+mute          = chords | signal | bass | pulse | texture, joined by +
 layers        = VOICE:(all | primary | shadow), joined by +
 effects       = EFFECT_TARGET:number, joined by +
 EFFECT_TARGET = mask | memory | veil | fracture | ghost | overclock
@@ -412,6 +415,7 @@ resonance     = number 0..12
 detune        = number -100..100
 glide         = number 0..0.5
 note_event    = STEP=NOTE[+NOTE...][~LENGTH][>]
+signal_event  = STEP=NOTE[~LENGTH][>]
 bass_event    = STEP=NOTE[~LENGTH][>]
 STEP          = 01..configured_steps
 LENGTH        = 1 | 2 | 3 | 4 | 8

@@ -130,7 +130,7 @@ export default function App() {
 
       <footer className="statusbar">
         <span><i className={audioReady ? 'status-ok' : ''} /> Audio begins only after your gesture</span>
-        <span>4 patterns · 4 voices · safe limiter −1 dB</span>
+        <span>4 patterns · 5 voices · safe limiter −1 dB</span>
         <span>IndexedDB autosave · no code execution</span>
       </footer>
       <StyleBrowser open={styleLabOpen} onClose={closeStyleLab} />

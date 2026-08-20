@@ -42,4 +42,14 @@ describe('data-driven style registry', () => {
     expect(first).toEqual(second)
     expect(first.styleInfluences).toEqual([{ id: 'ambient', amount: 0.2 }])
   })
+
+  it('keeps Signal explicitly authored when a style regenerates its four legacy lanes', () => {
+    const original = makeEmptyComposition()
+    getPattern(original, 'A').steps[3].signal = 'G4'
+    original.voices.signal.glide = 0.14
+    const styled = applyStyle(original, 'glitch', 1, replaceEverything)
+    expect(getPattern(styled, 'A').steps[3].signal).toBe('G4')
+    expect(styled.voices.signal.glide).toBe(0.14)
+    expect(styled.patterns.flatMap((pattern) => pattern.steps).filter((step) => step.signal).map((step) => step.signal)).toEqual(['G4'])
+  })
 })

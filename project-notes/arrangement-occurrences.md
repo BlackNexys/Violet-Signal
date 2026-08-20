@@ -53,7 +53,7 @@ pattern data and resolved Hold/Linear automation
 ```
 
 - Positive rotation moves the final pattern steps to the front. Steps, expression values, and every automation lane rotate together in a cloned virtual pattern.
-- Transposition applies only to Chord and Bass pitches at trigger time.
+- Transposition applies only to Chord, Signal, and Bass pitches at trigger time.
 - Occurrence mute prevents new events for that voice; existing release tails end naturally.
 - `all` plays Primary and follows the voice's normal Shadow enabled state.
 - `primary` plays Primary only.
@@ -69,4 +69,4 @@ Song-strip cells select occurrences rather than deleting them. The selected occu
 
 ## Compatibility contract
 
-Rotation and effects extend format v3 additively. Bare pattern letters and existing `transpose`, `mute`, and `layers` occurrences retain their previous sound. Serializing neutral rotation or effect values omits those fields, keeping old canonical notation compact.
+Rotation and effects were introduced additively in format v3. Format v4 adds Signal to the existing transpose, mute, and layer-selection rules. Bare pattern letters and neutral values retain their previous sound, and migrated Signal lanes are empty.

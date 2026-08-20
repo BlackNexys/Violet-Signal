@@ -27,7 +27,7 @@ The headline scenes teach four different starting grammars:
 
 ## Layer instrument sounds
 
-Each of the four voices now has a required **Primary** source and an optional **Shadow** source. Chord and Bass can use subtractive, FM, AM, dual-oscillator, or managed physical-pluck synthesis; Pulse and Texture add metallic and procedural-noise sources. Layer altitude, detune, level, Character, and response scales are explicit composition data and render identically in live playback and offline WAV output.
+Each of the five voices has a required **Primary** source and an optional **Shadow** source. Chord, Signal, and Bass can use subtractive, FM, AM, dual-oscillator, or managed physical-pluck synthesis; Pulse and Texture add metallic and procedural-noise sources. Signal is an independent monophonic lead lane with Glide and explicit legato. Layer altitude, detune, level, Character, and response scales are explicit composition data and render identically in live playback and offline WAV output.
 
 The built-in packs include **Blacklight Core**, **Veil Archive**, the dual/metal **Chrome Wound** family, and the physical-string **Fractured Relay** voices. Applying a patch is undoable, queues to the selected musical boundary during playback, and becomes **Custom** after manual sound editing. Sound-pack architecture and extension rules are documented in [`project-notes/instrument-packs.md`](project-notes/instrument-packs.md).
 
@@ -82,7 +82,7 @@ npm run browser:smoke
 2. Select a chord or bass cell in the adaptive 8–64-step grid.
 3. Press the touch keys or computer keys `A S D F G H J K` to add or remove exact pitches.
 4. Use scale-aware chord suggestions for a quick voicing.
-5. Choose a note length of 1, 2, 3, 4, or 8 sixteenth-note steps, or tie an authored Chord/Bass event into the next step for legato movement.
+5. Choose a note length of 1, 2, 3, 4, or 8 sixteenth-note steps, or tie an authored Chord, Signal, or Bass event into the next step for legato movement.
 
 The sequencer groups cells according to the selected meter. `/4` beats read `1 e & a`; `/8` beats read `1 &`. Pulse and Texture cells toggle directly. Velocity cycles through three useful emphasis levels, while per-step Chance, Ratchet, and Shift controls add deterministic variation and groove.
 
@@ -90,7 +90,7 @@ The sequencer groups cells according to the selected meter. `/4` beats read `1 e
 
 Four independent patterns can be appended to an arrangement of up to sixteen occurrences. Select an occurrence to transpose its pitched events, rotate its complete step memory and automation, mute voices for that repetition, focus each voice on all enabled layers, Primary only, or Shadow only, and add bounded effect modifiers. The source pattern remains unchanged, and the transport shows both the sounding pattern and current occurrence. The model and precedence rules are documented in [`project-notes/arrangement-occurrences.md`](project-notes/arrangement-occurrences.md).
 
-Chord, Bass, Pulse, and Texture voices each have Primary and optional Shadow layers plus a shared selectable filter, ADSR envelope, level, mute, and solo settings. The selected voice's **Depth** controls independently send that complete voice to the shared Fracture, Veil, Memory, and Environment returns. Every source is synthesized or procedurally generated; no remote samples are used.
+Chord, Signal, Bass, Pulse, and Texture voices each have Primary and optional Shadow layers plus a shared selectable filter, ADSR envelope, level, mute, and solo settings. The selected voice's **Depth** controls independently send that complete voice to the shared Fracture, Veil, Memory, and Environment returns. Every source is synthesized or procedurally generated; no remote samples are used.
 
 ### Add motion and perform
 
@@ -114,7 +114,7 @@ For a complete human- and AI-oriented editing reference—including every accept
 
 ```text
 scene "Rain Behind Glass" {
-  format-version: 3
+  format-version: 4
   style: darkwave
   style-version: 1
   influences: ambient=0.15
@@ -129,6 +129,7 @@ scene "Rain Behind Glass" {
   active: A
   arrangement: A A[transpose=12,rotate=-3,effects=memory:0.25] B[mute=pulse] C[layers=chords:shadow]
   voice chords: triangle volume=-10 cutoff=2550 attack=0.12 decay=0.62 sustain=0.64 release=2.2 send-fracture=0.2 send-veil=0.8 send-memory=0.6 send-environment=0.9 mute=off solo=off
+  voice signal: sawtooth volume=-15 cutoff=4200 attack=0.015 decay=0.24 sustain=0.46 release=0.55 send-fracture=0.25 send-veil=0.5 send-memory=0.55 send-environment=0.4 mute=off solo=off
   voice bass: triangle volume=-9 cutoff=950 attack=0.012 decay=0.3 sustain=0.5 release=0.7 send-fracture=0.55 send-veil=0.1 send-memory=0.2 send-environment=0.25 mute=off solo=off
   memory: 0.42
   environment: 0.34
@@ -140,6 +141,7 @@ scene "Rain Behind Glass" {
   output: -12
 
   notes A: 01=C4+Eb4+G4+Bb4~4 05=Ab3+C4+Eb4+G4~4
+  signal A: 03=G4> 04=Ab4~2
   bass A: 01=C2~4 05=Ab1~4
   pulse A: 03 07 11 15
   texture A: 03 11
@@ -164,7 +166,7 @@ The CodeMirror editor provides syntax coloring, suggestions, formatting, error-l
 - `src/persistence/` — IndexedDB project and automatic-recovery storage.
 - `src/components/` — instrument, step editor, arrangement, automation, code editor, project tools, and transport UI.
 
-The audio graph is created only after a user gesture. A shared source factory builds each voice's Primary and Shadow sources for both live and offline contexts. After its filter and level, each voice forks to a trimmed dry bus and four bounded sends feeding shared bit-reduction, stereo-chorus, delay, and generated-reverb processors in parallel. Their returns recombine before shared drive, master compensation, and a hard −1 dB limiter. Parameter changes ramp where Tone exposes signal parameters. One transport callback schedules all four voices, applies automation and seeded variations, advances arrangements, and commits queued code at musical boundaries. Scheduled events and nodes are cleared and disposed on unmount.
+The audio graph is created only after a user gesture. A shared source factory builds each voice's Primary and Shadow sources for both live and offline contexts. After its filter and level, each voice forks to a trimmed dry bus and four bounded sends feeding shared bit-reduction, stereo-chorus, delay, and generated-reverb processors in parallel. Their returns recombine before shared drive, master compensation, and a hard −1 dB limiter. Parameter changes ramp where Tone exposes signal parameters. One transport callback schedules all five voices, applies automation and seeded variations, advances arrangements, and commits queued code at musical boundaries. Scheduled events and nodes are cleared and disposed on unmount.
 
 ## Protections
 
@@ -179,8 +181,8 @@ The audio graph is created only after a user gesture. A shared source factory bu
 
 ## Current limitations
 
-- The musical architecture intentionally remains four voices, four editable patterns, and sixteen arrangement phrases; patterns can contain 8–64 steps.
-- Chord ties sustain common pitches and exchange changed voices; physical-pluck sources must re-excite changed pitches because their delay line cannot be continuously repitched. Mono subtractive, FM, AM, and dual Bass ties use their pitch-change and Glide path.
+- The musical architecture intentionally remains five voices, four editable patterns, and sixteen arrangement phrases; patterns can contain 8–64 steps. Signal is opt-in per authored step, so migrated projects and existing Style recipes do not gain unrequested lead notes.
+- Chord ties sustain common pitches and exchange changed voices; physical-pluck sources must re-excite changed pitches because their delay line cannot be continuously repitched. Mono subtractive, FM, AM, and dual Signal/Bass ties use their pitch-change and Glide path.
 - Offline WAV rendering includes deterministic Ghost/Humanize variation, step automation, and the shared parallel-effects graph. Temporary Pressure and Freeze Memory gestures require live capture.
 - Effect sends belong to a complete voice after its Primary/Shadow mix; separate per-layer processors and sends are intentionally not included.
 - Live recording format depends on the browser and is currently downloaded as WebM.
@@ -189,4 +191,4 @@ The audio graph is created only after a user gesture. A shared source factory bu
 
 ## Next valuable milestone
 
-Use composition feedback from the completed sound, arrangement, automation, tie, and routing milestones to decide between an optional fifth melodic Signal voice and completing the remaining Fractured Relay / Low Cinema patch content. The adopted sequence is maintained in [`notes/instrument-sound-and-layer-expansion-plan.md`](notes/instrument-sound-and-layer-expansion-plan.md).
+Complete the remaining Fractured Relay and Low Cinema patch content, now with Signal available as a dedicated lead role. The completed expansion sequence is maintained in [`notes/instrument-sound-and-layer-expansion-plan.md`](notes/instrument-sound-and-layer-expansion-plan.md).

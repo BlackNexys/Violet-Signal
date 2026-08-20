@@ -4,11 +4,11 @@ export const STEP_COUNT = DEFAULT_STEP_COUNT
 export const STEP_COUNT_OPTIONS = [8, 12, 14, 16, 20, 24, 28, 32, 64] as const
 export const METERS = ['4/4', '3/4', '6/8', '5/4', '7/8'] as const
 export const PATTERN_IDS = ['A', 'B', 'C', 'D'] as const
-export const VOICE_IDS = ['chords', 'bass', 'pulse', 'texture'] as const
+export const VOICE_IDS = ['chords', 'signal', 'bass', 'pulse', 'texture'] as const
 export const EFFECT_SEND_TARGETS = ['fracture', 'veil', 'memory', 'environment'] as const
 export const SCALE_ROOTS = ['C', 'C#', 'Db', 'D', 'D#', 'Eb', 'E', 'F', 'F#', 'Gb', 'G', 'G#', 'Ab', 'A', 'A#', 'Bb', 'B'] as const
 export const SCALE_MODES = ['minor', 'major', 'dorian', 'phrygian', 'harmonic minor', 'melodic minor', 'pentatonic'] as const
-export const FORMAT_VERSION = 3
+export const FORMAT_VERSION = 4
 
 export type PatternId = (typeof PATTERN_IDS)[number]
 export type Waveform = 'sine' | 'triangle' | 'square' | 'sawtooth'
@@ -23,7 +23,7 @@ export type EffectSendTarget = (typeof EFFECT_SEND_TARGETS)[number]
 export type LayerSlot = 'primary' | 'shadow'
 export type ArrangementLayerSelection = 'all' | LayerSlot
 export type InstrumentEngine = 'subtractive' | 'fm' | 'am' | 'dual' | 'pluck' | 'membrane' | 'metal' | 'noise'
-export type NoteLane = 'notes' | 'bass'
+export type NoteLane = 'notes' | 'signal' | 'bass'
 export type StepLane = NoteLane | 'drum' | 'texture'
 export type AutomationTarget = 'mask' | 'memory' | 'veil' | 'fracture' | 'ghost' | 'overclock'
 export type AutomationMode = 'hold' | 'linear'
@@ -42,13 +42,16 @@ export const SCALE_INTERVALS: Record<ScaleMode, readonly number[]> = {
 
 export interface Step {
   notes: string[]
+  signal: string | null
   bass: string | null
   drum: boolean
   texture: boolean
   velocity: number
   chordLength: number
+  signalLength: number
   bassLength: number
   chordTie: boolean
+  signalTie: boolean
   bassTie: boolean
   probability: number
   ratchets: number
@@ -152,13 +155,16 @@ export const DEFAULT_SOUND_SETTINGS: SoundSettings = {
 
 export const makeEmptyStep = (): Step => ({
   notes: [],
+  signal: null,
   bass: null,
   drum: false,
   texture: false,
   velocity: 0.72,
   chordLength: 1,
+  signalLength: 1,
   bassLength: 1,
   chordTie: false,
+  signalTie: false,
   bassTie: false,
   probability: 1,
   ratchets: 1,
@@ -185,6 +191,7 @@ export const makeAutomationModes = (): AutomationModes => ({
 
 const DEFAULT_WAVEFORMS: Record<VoiceId, Waveform> = {
   chords: 'triangle',
+  signal: 'sawtooth',
   bass: 'triangle',
   pulse: 'sine',
   texture: 'sawtooth',
@@ -192,6 +199,7 @@ const DEFAULT_WAVEFORMS: Record<VoiceId, Waveform> = {
 
 const DEFAULT_ENGINES: Record<VoiceId, InstrumentEngine> = {
   chords: 'subtractive',
+  signal: 'subtractive',
   bass: 'subtractive',
   pulse: 'membrane',
   texture: 'noise',
@@ -199,6 +207,7 @@ const DEFAULT_ENGINES: Record<VoiceId, InstrumentEngine> = {
 
 export const ENGINES_BY_VOICE: Record<VoiceId, InstrumentEngine[]> = {
   chords: ['subtractive', 'fm', 'am', 'dual', 'pluck'],
+  signal: ['subtractive', 'fm', 'am', 'dual', 'pluck'],
   bass: ['subtractive', 'fm', 'am', 'dual', 'pluck'],
   pulse: ['membrane', 'metal', 'noise'],
   texture: ['metal', 'noise'],
@@ -349,6 +358,7 @@ export const makeEmptyComposition = (): Composition => ({
   sound: { ...DEFAULT_SOUND_SETTINGS },
   voices: {
     chords: makeVoiceSettings('chords'),
+    signal: makeVoiceSettings('signal', { core: 'sawtooth', cutoff: 4200, attack: 0.015, decay: 0.24, sustain: 0.46, release: 0.55, glide: 0.06, volume: -15, sends: { fracture: 0.25, veil: 0.5, memory: 0.55, environment: 0.4 } }),
     bass: makeVoiceSettings('bass', { core: 'triangle', cutoff: 950, attack: 0.012, decay: 0.3, sustain: 0.5, release: 0.7, volume: -9 }),
     pulse: makeVoiceSettings('pulse', { core: 'sine', cutoff: 2100, attack: 0.005, decay: 0.09, sustain: 0, release: 0.06, volume: -16 }),
     texture: makeVoiceSettings('texture', { core: 'sawtooth', cutoff: 1400, attack: 0.08, decay: 0.6, sustain: 0.12, release: 1.8, volume: -22 }),
@@ -431,10 +441,13 @@ export function cloneStep(step: Step): Step {
   return {
     ...step,
     notes: [...step.notes],
+    signal: step.signal ?? null,
     probability: step.probability ?? 1,
     ratchets: step.ratchets ?? 1,
     microShift: step.microShift ?? 0,
     chordTie: step.chordTie ?? false,
+    signalLength: step.signalLength ?? 1,
+    signalTie: step.signalTie ?? false,
     bassTie: step.bassTie ?? false,
   }
 }
@@ -484,6 +497,7 @@ export function cloneComposition(composition: Composition): Composition {
     sound: { ...DEFAULT_SOUND_SETTINGS, ...composition.sound },
     voices: {
       chords: normalizeVoice('chords', composition.voices?.chords),
+      signal: normalizeVoice('signal', composition.voices?.signal),
       bass: normalizeVoice('bass', composition.voices?.bass),
       pulse: normalizeVoice('pulse', composition.voices?.pulse),
       texture: normalizeVoice('texture', composition.voices?.texture),
@@ -495,7 +509,7 @@ export function cloneComposition(composition: Composition): Composition {
 
 function normalizeVoice(id: VoiceId, input: VoiceSettings | undefined): VoiceSettings {
   const legacy = (input ?? {}) as VoiceSettings & { core?: Waveform; detune?: number }
-  const defaults = makeVoiceSettings(id, id === 'bass' ? { cutoff: 950, volume: -9 } : id === 'pulse' ? { cutoff: 2100, volume: -16 } : id === 'texture' ? { cutoff: 1400, volume: -22 } : {})
+  const defaults = makeVoiceSettings(id, id === 'signal' ? { core: 'sawtooth', cutoff: 4200, attack: 0.015, decay: 0.24, sustain: 0.46, release: 0.55, glide: 0.06, volume: -15, sends: { fracture: 0.25, veil: 0.5, memory: 0.55, environment: 0.4 } } : id === 'bass' ? { cutoff: 950, volume: -9 } : id === 'pulse' ? { cutoff: 2100, volume: -16 } : id === 'texture' ? { cutoff: 1400, volume: -22 } : {})
   const primary = legacy.layers?.primary ?? makeVoiceLayer(id, 'primary', { waveform: legacy.core ?? defaults.layers.primary.waveform, detune: legacy.detune ?? 0 })
   const shadow = legacy.layers?.shadow ?? makeVoiceLayer(id, 'shadow')
   const channel = { ...legacy } as unknown as Record<string, unknown>
@@ -508,7 +522,7 @@ function normalizeVoice(id: VoiceId, input: VoiceSettings | undefined): VoiceSet
     ...defaults,
     ...channel,
     patchId: legacy.patchId ?? null,
-    sends: Object.fromEntries(EFFECT_SEND_TARGETS.map((target) => [target, clamp(legacy.sends?.[target] ?? 1, 0, 1)])) as Record<EffectSendTarget, number>,
+    sends: Object.fromEntries(EFFECT_SEND_TARGETS.map((target) => [target, clamp(legacy.sends?.[target] ?? (input ? 1 : defaults.sends[target]), 0, 1)])) as Record<EffectSendTarget, number>,
     layers: {
       primary: normalizeLayer(id, 'primary', primary),
       shadow: normalizeLayer(id, 'shadow', shadow),
@@ -577,6 +591,7 @@ export function transposePattern(pattern: Pattern, semitones: number): Pattern {
   const next = clonePattern(pattern)
   next.steps.forEach((step) => {
     step.notes = step.notes.map((note) => transposeNote(note, semitones))
+    if (step.signal) step.signal = transposeNote(step.signal, semitones)
     if (step.bass) step.bass = transposeNote(step.bass, semitones)
   })
   return next

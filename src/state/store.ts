@@ -235,6 +235,9 @@ export const useAppStore = create<AppState>((set, get) => {
         const bassNote = note.replace(/-?\d$/, '2')
         step.bass = step.bass === bassNote ? null : bassNote
         if (!step.bass) step.bassTie = false
+      } else if (get().selectedLane === 'signal') {
+        step.signal = step.signal === note ? null : note
+        if (!step.signal) step.signalTie = false
       } else {
         step.notes = step.notes.includes(note) ? step.notes.filter((current) => current !== note) : [...step.notes, note]
         step.notes.sort((left, right) => (noteToMidi(left) ?? 0) - (noteToMidi(right) ?? 0))
@@ -250,6 +253,7 @@ export const useAppStore = create<AppState>((set, get) => {
       const { pattern, stepIndex } = selectedTarget(draft)
       const step = pattern.steps[stepIndex]
       if (get().selectedLane === 'notes') { step.notes = []; step.chordTie = false }
+      if (get().selectedLane === 'signal') { step.signal = null; step.signalTie = false }
       if (get().selectedLane === 'bass') { step.bass = null; step.bassTie = false }
       if (get().selectedLane === 'drum') step.drum = false
       if (get().selectedLane === 'texture') step.texture = false
@@ -260,13 +264,15 @@ export const useAppStore = create<AppState>((set, get) => {
     }),
     setStepLength: (lane, length) => commitMutation((draft) => {
       const { pattern, stepIndex } = selectedTarget(draft)
-      pattern.steps[stepIndex][lane === 'notes' ? 'chordLength' : 'bassLength'] = clamp(Math.round(length), 1, 8)
+      const key = lane === 'notes' ? 'chordLength' : lane === 'signal' ? 'signalLength' : 'bassLength'
+      pattern.steps[stepIndex][key] = clamp(Math.round(length), 1, 8)
     }),
     setStepTie: (lane, tied) => commitMutation((draft) => {
       const { pattern, stepIndex } = selectedTarget(draft)
       const step = pattern.steps[stepIndex]
-      const hasEvent = lane === 'notes' ? step.notes.length > 0 : Boolean(step.bass)
-      step[lane === 'notes' ? 'chordTie' : 'bassTie'] = hasEvent && tied
+      const hasEvent = lane === 'notes' ? step.notes.length > 0 : lane === 'signal' ? Boolean(step.signal) : Boolean(step.bass)
+      const key = lane === 'notes' ? 'chordTie' : lane === 'signal' ? 'signalTie' : 'bassTie'
+      step[key] = hasEvent && tied
     }),
     cycleVelocity: (stepIndex) => commitMutation((draft) => {
       const step = getActivePattern(draft).steps[stepIndex]

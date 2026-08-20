@@ -46,7 +46,7 @@ export const tutorialSteps: TutorialStep[] = [
   {
     id: 'notes', eyebrow: '04 · Give it a voice', title: 'Assign exact notes',
     body: 'Use the touch keys or A S D F G H J K. Pressing an assigned pitch again removes it.',
-    detail: 'For chords, the Roman-numeral suggestions create scale-aware voicings. Length holds the note for several steps.',
+    detail: 'For chords, Roman-numeral suggestions create scale-aware voicings. Signal is the independent mono lead; Chord, Signal, and Bass support length and ties.',
     selector: '.touch-keyboard', view: 'instrument', mobileDialog: 'top',
   },
   {
@@ -96,6 +96,7 @@ export const cheatSections: CheatSection[] = [
       { term: 'Chord', description: 'Join pitches with +.', example: '05=C4+Eb4+G4' },
       { term: 'Held chord', description: 'Use ~ followed by a step length.', example: '05=C4+Eb4+G4~4' },
       { term: 'Tie / legato', description: 'Use > to carry an authored event into the next step without restarting shared pitches.', example: '01=C2> 02=D2' },
+      { term: 'Signal', description: 'One monophonic lead pitch per assignment.', example: 'signal A: 03=G4> 04=Ab4' },
       { term: 'Bass', description: 'One pitch per assignment.', example: 'bass A: 01=C2~4' },
       { term: 'Pulse', description: 'List the steps that should strike.', example: 'pulse A: 01 05 09 13' },
       { term: 'Texture', description: 'List procedural-noise events.', example: 'texture A: 03 11' },
@@ -135,6 +136,7 @@ export const cheatSections: CheatSection[] = [
     id: 'terms', title: 'Blacklight terms', intro: 'The fiction is always paired with the conventional synthesis idea.',
     items: [
       { term: 'Sound', description: 'A versioned voice patch copied into editable composition settings.' },
+      { term: 'Signal', description: 'The opt-in monophonic lead voice and its independent note lane.' },
       { term: 'Primary', description: 'The required main synthesis layer.' },
       { term: 'Shadow', description: 'An optional second synthesis layer triggered by the same events.' },
       { term: 'Character', description: 'A bounded macro for the selected engine tone.' },

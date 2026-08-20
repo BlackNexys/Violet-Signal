@@ -1,5 +1,6 @@
 import {
   PATTERN_IDS,
+  VOICE_IDS,
   FORMAT_VERSION,
   METERS,
   STEP_COUNT_OPTIONS,
@@ -36,7 +37,7 @@ class DslError extends Error {
 
 const WAVEFORMS: Waveform[] = ['sine', 'triangle', 'square', 'sawtooth']
 const FILTER_TYPES: FilterType[] = ['lowpass', 'highpass', 'bandpass']
-const VOICES: VoiceId[] = ['chords', 'bass', 'pulse', 'texture']
+const VOICES: VoiceId[] = [...VOICE_IDS]
 const ENGINES: InstrumentEngine[] = ['subtractive', 'fm', 'am', 'dual', 'pluck', 'membrane', 'metal', 'noise']
 const STYLE_IDS = STYLE_DEFINITIONS.map((style) => style.id)
 function fail(message: string, line: number, excerpt: string): never { throw new DslError(message, line, excerpt) }
@@ -99,7 +100,7 @@ function parseArrangementOccurrence(value: string, line: number, excerpt: string
       if (raw === 'none') continue
       const configuredVoices = new Set<VoiceId>()
       for (const layerAssignment of raw.split('+')) {
-        const layer = /^(chords|bass|pulse|texture):(all|primary|shadow)$/.exec(layerAssignment)
+        const layer = /^(chords|signal|bass|pulse|texture):(all|primary|shadow)$/.exec(layerAssignment)
         if (!layer) fail('Occurrence layers use voice:all, voice:primary, or voice:shadow.', line, excerpt)
         const voice = layer[1] as VoiceId
         if (configuredVoices.has(voice)) fail(`Occurrence layers configures “${voice}” more than once.`, line, excerpt)
@@ -271,7 +272,7 @@ export function parseComposition(source: string): ParseResult {
       const value = property[2].trim()
       if (!value) fail(`“${property[1]}” is waiting for a value.`, lineNumber, rawLine)
 
-      const patchMatch = /^patch\s+(chords|bass|pulse|texture)$/i.exec(key)
+      const patchMatch = /^patch\s+(chords|signal|bass|pulse|texture)$/i.exec(key)
       if (patchMatch) {
         const id = patchMatch[1].toLowerCase() as VoiceId
         if (value.toLowerCase() === 'custom') composition.voices[id].patchId = null
@@ -282,7 +283,7 @@ export function parseComposition(source: string): ParseResult {
         }
         continue
       }
-      const layerMatch = /^layer\s+(chords|bass|pulse|texture)\s+shadow$/i.exec(key)
+      const layerMatch = /^layer\s+(chords|signal|bass|pulse|texture)\s+shadow$/i.exec(key)
       if (layerMatch) {
         const id = layerMatch[1].toLowerCase() as VoiceId
         parseLayer(value, id, composition.voices[id].layers.shadow, lineNumber, rawLine)
@@ -294,12 +295,12 @@ export function parseComposition(source: string): ParseResult {
         parseVoice(value, id, composition.voices[id], lineNumber, rawLine)
         continue
       }
-      const laneMatch = /^(notes|bass|pulse|texture|emphasis)\s+([a-d])$/i.exec(key)
+      const laneMatch = /^(notes|signal|bass|pulse|texture|emphasis)\s+([a-d])$/i.exec(key)
       if (laneMatch) {
         const lane = laneMatch[1].toLowerCase()
         const id = patternId(laneMatch[2].toUpperCase(), lineNumber, rawLine)
         const pattern = composition.patterns.find((item) => item.id === id)!
-        if (lane === 'notes' || lane === 'bass') {
+        if (lane === 'notes' || lane === 'signal' || lane === 'bass') {
           for (const assignment of parsePitchedAssignments(value, composition.stepCount, lineNumber, rawLine)) {
             if (lane === 'notes') {
               const notes = assignment.value.split('+')
@@ -309,10 +310,16 @@ export function parseComposition(source: string): ParseResult {
               pattern.steps[assignment.step].chordLength = assignment.length ?? 1
               pattern.steps[assignment.step].chordTie = assignment.tie
             } else {
-              if (!isNote(assignment.value)) fail(`“${assignment.value}” is not a bass note I recognize.`, lineNumber, rawLine)
-              pattern.steps[assignment.step].bass = assignment.value
-              pattern.steps[assignment.step].bassLength = assignment.length ?? 1
-              pattern.steps[assignment.step].bassTie = assignment.tie
+              if (!isNote(assignment.value)) fail(`“${assignment.value}” is not a ${lane} note I recognize.`, lineNumber, rawLine)
+              if (lane === 'signal') {
+                pattern.steps[assignment.step].signal = assignment.value
+                pattern.steps[assignment.step].signalLength = assignment.length ?? 1
+                pattern.steps[assignment.step].signalTie = assignment.tie
+              } else {
+                pattern.steps[assignment.step].bass = assignment.value
+                pattern.steps[assignment.step].bassLength = assignment.length ?? 1
+                pattern.steps[assignment.step].bassTie = assignment.tie
+              }
             }
           }
         } else if (lane === 'pulse' || lane === 'texture') {
@@ -490,7 +497,16 @@ export function parseComposition(source: string): ParseResult {
       const patchId = composition.voices[id].patchId
       if (!patchId) continue
       const patch = getInstrumentPatch(patchId)
-      if (!patch || JSON.stringify(composition.voices[id]) !== JSON.stringify(patch.settings)) composition.voices[id].patchId = null
+      if (!patch) { composition.voices[id].patchId = null; continue }
+      const voiceSound: Partial<VoiceSettings> = { ...composition.voices[id] }
+      const patchSound: Partial<VoiceSettings> = { ...patch.settings }
+      delete voiceSound.sends
+      delete voiceSound.mute
+      delete voiceSound.solo
+      delete patchSound.sends
+      delete patchSound.mute
+      delete patchSound.solo
+      if (JSON.stringify(voiceSound) !== JSON.stringify(patchSound)) composition.voices[id].patchId = null
     }
     return { ok: true, composition }
   } catch (error) {

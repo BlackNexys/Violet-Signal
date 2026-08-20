@@ -20,7 +20,7 @@ import { ControlSlider } from './ControlSlider'
 
 interface InstrumentPanelProps { audition: (note: string) => void }
 
-const voiceLabels: Record<VoiceId, string> = { chords: 'Chord', bass: 'Bass', pulse: 'Pulse', texture: 'Texture' }
+const voiceLabels: Record<VoiceId, string> = { chords: 'Chord', signal: 'Signal', bass: 'Bass', pulse: 'Pulse', texture: 'Texture' }
 const waveforms: Array<{ value: Waveform; label: string }> = [
   { value: 'sine', label: 'Sine — soft' }, { value: 'triangle', label: 'Triangle — glass' },
   { value: 'square', label: 'Square — hollow' }, { value: 'sawtooth', label: 'Saw — bright' },
@@ -72,7 +72,7 @@ export function InstrumentPanel({ audition }: InstrumentPanelProps) {
 
   const playAndAssign = (note: string) => {
     audition(note)
-    if (selectedLane === 'notes' || selectedLane === 'bass') assignNote(note)
+    if (selectedLane === 'notes' || selectedLane === 'signal' || selectedLane === 'bass') assignNote(note)
   }
   const gestureKey = (active: boolean, setter: (value: boolean) => void) => (event: React.KeyboardEvent<HTMLButtonElement>) => {
     if (event.key !== ' ' && event.key !== 'Enter') return
@@ -96,7 +96,7 @@ export function InstrumentPanel({ audition }: InstrumentPanelProps) {
   return (
     <section className="workspace-panel instrument-panel" aria-labelledby="instrument-heading">
       <div className="panel-heading">
-        <div><span className="eyebrow">Four independent voices</span><h2 id="instrument-heading">Instrument</h2></div>
+        <div><span className="eyebrow">Five independent voices</span><h2 id="instrument-heading">Instrument</h2></div>
         <AudioWaveform size={19} aria-hidden="true" />
       </div>
 

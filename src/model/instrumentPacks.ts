@@ -76,6 +76,9 @@ export const INSTRUMENT_PATCHES: InstrumentPatchDefinition[] = [
   definePatch('blacklight-core', 'quiet-circuit', 'Quiet Circuit', 'Classic filtered poly synth', ['clear', 'soft', 'balanced'], 'chords', {
     core: 'triangle', cutoff: 2800, resonance: 0.7, attack: 0.05, decay: 0.38, sustain: 0.58, release: 1.4, volume: -10,
   }),
+  definePatch('blacklight-core', 'carrier-line', 'Carrier Line', 'Gliding monophonic lead synth', ['lead', 'clear', 'focused'], 'signal', {
+    core: 'sawtooth', cutoff: 4200, resonance: 1.2, attack: 0.015, decay: 0.24, sustain: 0.46, release: 0.55, glide: 0.06, volume: -15,
+  }),
   definePatch('blacklight-core', 'underline', 'Underline', 'Focused subtractive mono bass', ['grounded', 'warm', 'direct'], 'bass', {
     core: 'triangle', cutoff: 950, resonance: 0.7, attack: 0.012, decay: 0.3, sustain: 0.5, release: 0.7, volume: -9,
   }),
@@ -94,6 +97,11 @@ export const INSTRUMENT_PATCHES: InstrumentPatchDefinition[] = [
     cutoff: 620, resonance: 1.8, attack: 0.018, decay: 0.42, sustain: 0.66, release: 1.05, glide: 0.08, volume: -8,
     primary: { engine: 'subtractive', waveform: 'sine', character: 0.12, level: -1 },
     shadow: { enabled: true, engine: 'fm', waveform: 'sine', octave: 0, detune: -6, level: -18, character: 0.28, attackScale: 0.8, releaseScale: 0.75 },
+  }),
+  definePatch('veil-archive', 'cold-beacon', 'Cold Beacon', 'AM lead with a distant FM octave', ['lead', 'glassy', 'spatial'], 'signal', {
+    cutoff: 5100, resonance: 1.6, attack: 0.035, decay: 0.4, sustain: 0.52, release: 1.1, glide: 0.085, volume: -17,
+    primary: { engine: 'am', waveform: 'triangle', level: -3, character: 0.48 },
+    shadow: { enabled: true, engine: 'fm', waveform: 'sine', octave: 1, detune: 7, level: -20, character: 0.42, attackScale: 1.4, releaseScale: 1.25 },
   }),
   definePatch('chrome-wound', 'razor-assembly', 'Razor Assembly', 'Wide dual-oscillator saw stack', ['wide', 'bright', 'unstable'], 'chords', {
     cutoff: 3600, resonance: 2.1, attack: 0.025, decay: 0.42, sustain: 0.5, release: 1.25, volume: -15,
@@ -119,6 +127,11 @@ export const INSTRUMENT_PATCHES: InstrumentPatchDefinition[] = [
     cutoff: 1350, resonance: 1.9, attack: 0.005, decay: 0.18, sustain: 0.08, release: 0.48, volume: -11,
     primary: { engine: 'pluck', waveform: 'triangle', level: -5, character: 0.44 },
     shadow: { enabled: true, engine: 'subtractive', waveform: 'sine', octave: -1, level: -22, character: 0.1, releaseScale: 0.5 },
+  }),
+  definePatch('fractured-relay', 'needle-light', 'Needle Light', 'Physical-string lead with a narrow synth shadow', ['lead', 'plucked', 'precise'], 'signal', {
+    cutoff: 3600, filterType: 'bandpass', resonance: 2.4, attack: 0.005, decay: 0.2, sustain: 0.08, release: 0.7, glide: 0, volume: -17,
+    primary: { engine: 'pluck', waveform: 'triangle', level: -5, character: 0.58 },
+    shadow: { enabled: true, engine: 'subtractive', waveform: 'square', octave: 1, detune: -5, level: -23, character: 0.18, attackScale: 0.5, releaseScale: 0.6 },
   }),
   definePatch('fractured-relay', 'relay-click', 'Relay Click', 'Clipped metallic machine transient', ['click', 'industrial', 'dry'], 'pulse', {
     cutoff: 5200, filterType: 'highpass', resonance: 2.2, attack: 0.005, decay: 0.06, sustain: 0, release: 0.045, volume: -22,

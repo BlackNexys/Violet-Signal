@@ -13,13 +13,13 @@ import {
 const amount = (value: number) => Number(value.toFixed(3)).toString()
 const stepNumber = (index: number) => String(index + 1).padStart(2, '0')
 
-function noteAssignments(pattern: Pattern, lane: 'notes' | 'bass'): string {
+function noteAssignments(pattern: Pattern, lane: 'notes' | 'signal' | 'bass'): string {
   const assignments: string[] = []
   pattern.steps.forEach((step, index) => {
-    const value = lane === 'notes' ? step.notes.join('+') : step.bass
+    const value = lane === 'notes' ? step.notes.join('+') : step[lane]
     if (!value) return
-    const length = lane === 'notes' ? step.chordLength : step.bassLength
-    const tie = lane === 'notes' ? step.chordTie : step.bassTie
+    const length = lane === 'notes' ? step.chordLength : lane === 'signal' ? step.signalLength : step.bassLength
+    const tie = lane === 'notes' ? step.chordTie : lane === 'signal' ? step.signalTie : step.bassTie
     assignments.push(`${stepNumber(index)}=${value}${length > 1 ? `~${length}` : ''}${tie ? '>' : ''}`)
   })
   return assignments.length ? assignments.join(' ') : 'none'
@@ -85,18 +85,11 @@ export function serializeComposition(composition: Composition): string {
     `  patterns: ${PATTERN_IDS.join(' ')}`,
     `  active: ${composition.activePatternId}`,
     `  arrangement: ${composition.arrangement.map(arrangementOccurrence).join(' ')}`,
-    `  patch chords: ${composition.voices.chords.patchId ?? 'custom'}`,
-    voiceLine(composition, 'chords'),
-    shadowLine(composition, 'chords'),
-    `  patch bass: ${composition.voices.bass.patchId ?? 'custom'}`,
-    voiceLine(composition, 'bass'),
-    shadowLine(composition, 'bass'),
-    `  patch pulse: ${composition.voices.pulse.patchId ?? 'custom'}`,
-    voiceLine(composition, 'pulse'),
-    shadowLine(composition, 'pulse'),
-    `  patch texture: ${composition.voices.texture.patchId ?? 'custom'}`,
-    voiceLine(composition, 'texture'),
-    shadowLine(composition, 'texture'),
+    ...VOICE_IDS.flatMap((id) => [
+      `  patch ${id}: ${composition.voices[id].patchId ?? 'custom'}`,
+      voiceLine(composition, id),
+      shadowLine(composition, id),
+    ]),
     `  memory: ${amount(composition.sound.memory)}`,
     `  environment: ${amount(composition.sound.environment)}`,
     `  veil: ${amount(composition.sound.veil)}`,
@@ -111,6 +104,7 @@ export function serializeComposition(composition: Composition): string {
   for (const pattern of composition.patterns) {
     lines.push(`  // Pattern ${pattern.id}`)
     lines.push(`  notes ${pattern.id}: ${noteAssignments(pattern, 'notes')}`)
+    lines.push(`  signal ${pattern.id}: ${noteAssignments(pattern, 'signal')}`)
     lines.push(`  bass ${pattern.id}: ${noteAssignments(pattern, 'bass')}`)
     lines.push(`  pulse ${pattern.id}: ${hitAssignments(pattern, 'drum')}`)
     lines.push(`  texture ${pattern.id}: ${hitAssignments(pattern, 'texture')}`)
@@ -139,7 +133,7 @@ export function activeTokenRanges(source: string, step: number, patternId?: Patt
   let offset = 0
 
   for (const line of source.replace(/\r/g, '').split('\n')) {
-    const match = /^\s*(notes|bass|pulse|texture|emphasis|chance|ratchet|shift|automate\s+\w+)\s+([A-D])(?:\s+(?:hold|linear))?\s*:\s*(.*)$/.exec(line)
+    const match = /^\s*(notes|signal|bass|pulse|texture|emphasis|chance|ratchet|shift|automate\s+\w+)\s+([A-D])(?:\s+(?:hold|linear))?\s*:\s*(.*)$/.exec(line)
     if (match && (!patternId || match[2] === patternId)) {
       const valueStart = line.indexOf(match[3])
       for (const token of match[3].matchAll(/\S+/g)) {

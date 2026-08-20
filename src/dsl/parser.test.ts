@@ -122,19 +122,21 @@ describe('Violet Signal DSL', () => {
     expect(roundTrip.ok && roundTrip.composition).toEqual(result.composition)
   })
 
-  it('round-trips explicit Chord and Bass ties independently from gate length', () => {
+  it('round-trips explicit Chord, Signal, and Bass ties independently from gate length', () => {
     const result = parseComposition(`scene "Connected Signal" {
   notes A: 01=C4+Eb4+G4> 02=D4+F4+A4~2>
+  signal A: 01=G4> 02=Ab4~3
   bass A: 01=C2> 02=D2~4
 }`)
     expect(result.ok).toBe(true)
     if (!result.ok) return
 
     const [first, second] = result.composition.patterns[0].steps
-    expect(first).toMatchObject({ chordTie: true, bassTie: true })
-    expect(second).toMatchObject({ chordTie: true, bassTie: false, chordLength: 2, bassLength: 4 })
+    expect(first).toMatchObject({ chordTie: true, signalTie: true, bassTie: true })
+    expect(second).toMatchObject({ chordTie: true, signalTie: false, bassTie: false, chordLength: 2, signalLength: 3, bassLength: 4 })
     const canonical = serializeComposition(result.composition)
     expect(canonical).toContain('notes A: 01=C4+Eb4+G4> 02=D4+F4+A4~2>')
+    expect(canonical).toContain('signal A: 01=G4> 02=Ab4~3')
     expect(canonical).toContain('bass A: 01=C2> 02=D2~4')
     const roundTrip = parseComposition(canonical)
     expect(roundTrip.ok && roundTrip.composition).toEqual(result.composition)
@@ -162,6 +164,23 @@ describe('Violet Signal DSL', () => {
       primary: { engine: 'am', enabled: true },
       shadow: { engine: 'fm', enabled: true, octave: 1 },
     })
+  })
+
+  it('round-trips the Signal voice, its patch, and occurrence controls', () => {
+    const composition = applyInstrumentPatch(makeEmptyComposition(), 'signal', 'veil-archive/cold-beacon@1')
+    composition.patterns[0].steps[2].signal = 'G4'
+    composition.patterns[0].steps[2].signalLength = 2
+    composition.arrangement[0].mute = ['signal']
+    composition.arrangement[1].layers.signal = 'shadow'
+    const canonical = serializeComposition(composition)
+    const result = parseComposition(canonical)
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.composition).toEqual(composition)
+    expect(canonical).toContain('patch signal: veil-archive/cold-beacon@1')
+    expect(canonical).toContain('signal A: 03=G4~2')
+    expect(canonical).toContain('mute=signal')
+    expect(canonical).toContain('layers=signal:shadow')
   })
 
   it('round-trips bounded per-voice effect sends', () => {
@@ -250,7 +269,7 @@ describe('Violet Signal DSL', () => {
 
   it.each([
     ['A[transpose=25]', 'can range from -24 to 24'],
-    ['A[mute=signal]', 'mute can use'],
+    ['A[mute=lead]', 'mute can use'],
     ['A[layers=chords:shadow+chords:primary]', 'more than once'],
     ['A[rotate=64]', 'can range from -63 to 63'],
     ['A[effects=mask:0.1]', 'can range from 0.25 to 4'],

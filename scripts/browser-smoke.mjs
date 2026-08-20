@@ -171,6 +171,15 @@ try {
   await soundPatch.selectOption('chrome-wound/razor-assembly@1')
   expect(await soundPatch.inputValue() === 'chrome-wound/razor-assembly@1', 'dual patch did not remain selected')
   await page.getByText('Wide dual-oscillator saw stack').waitFor()
+  await page.getByLabel('Voice controls').getByRole('button', { name: 'Signal', exact: true }).click()
+  await soundPatch.selectOption('fractured-relay/needle-light@1')
+  expect(await soundPatch.inputValue() === 'fractured-relay/needle-light@1', 'Signal pluck patch did not remain selected')
+  await page.getByText('Physical-string lead with a narrow synth shadow').waitFor()
+  await page.getByRole('button', { name: /Step 3 signal/ }).click()
+  await secondTouchKey.click()
+  await page.getByRole('checkbox', { name: /Tie to next step/ }).check()
+  await page.getByRole('button', { name: /Step 4 signal/ }).click()
+  await page.locator('.touch-keyboard button').nth(3).click()
   await page.getByLabel('Voice controls').getByRole('button', { name: 'Bass', exact: true }).click()
   await soundPatch.selectOption('fractured-relay/wire-below@1')
   expect(await soundPatch.inputValue() === 'fractured-relay/wire-below@1', 'pluck patch did not remain selected')
@@ -228,7 +237,7 @@ try {
   await page.screenshot({ path: 'artifacts/violet-signal-narrow.png', fullPage: true })
 
   if (failures.length) throw new Error(failures.join('\n'))
-  console.log('Browser smoke passed: scales, styles, arrangement occurrences, Hold/Linear automation, Chord/Bass ties, per-voice effect sends, expanded engines, synchronization, parser protection, audio effects, capture, WAV, and responsive tabs.')
+  console.log('Browser smoke passed: scales, styles, arrangement occurrences, Hold/Linear automation, Chord/Signal/Bass ties, five-voice patches and sends, synchronization, parser protection, live audio, capture, WAV, and responsive tabs.')
 } finally {
   await browser.close()
 }

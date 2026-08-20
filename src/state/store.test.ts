@@ -65,6 +65,18 @@ describe('shared composition state', () => {
     expect(useAppStore.getState().code).toContain('06=D4+F4~3')
   })
 
+  it('authors an independent monophonic Signal lane with length and ties', () => {
+    useAppStore.getState().selectStep(5, 'signal')
+    useAppStore.getState().assignNote('G4')
+    useAppStore.getState().setStepLength('signal', 3)
+    useAppStore.getState().setStepTie('signal', true)
+    const state = useAppStore.getState()
+    expect(getActivePattern(state.composition).steps[5]).toMatchObject({ signal: 'G4', signalLength: 3, signalTie: true })
+    expect(state.code).toContain('signal A: 06=G4~3>')
+    useAppStore.getState().clearSelectedLane()
+    expect(getActivePattern(useAppStore.getState().composition).steps[5]).toMatchObject({ signal: null, signalTie: false })
+  })
+
   it('projects step expression into generated code', () => {
     useAppStore.getState().selectStep(4, 'drum')
     useAppStore.getState().setStepExpression('probability', 0.65)
@@ -172,6 +184,15 @@ describe('shared composition state', () => {
     expect(useAppStore.getState().code).toContain('layer chords shadow: on')
     useAppStore.getState().undo()
     expect(useAppStore.getState().composition.voices.chords.patchId).toBe('veil-archive/glass-choir@1')
+  })
+
+  it('applies a Signal patch without changing its effect placement', () => {
+    useAppStore.getState().updateVoiceSend('signal', 'memory', 0.31)
+    useAppStore.getState().applyInstrumentPatch('signal', 'fractured-relay/needle-light@1')
+    const signal = useAppStore.getState().composition.voices.signal
+    expect(signal).toMatchObject({ patchId: 'fractured-relay/needle-light@1', glide: 0 })
+    expect(signal.layers.primary.engine).toBe('pluck')
+    expect(signal.sends.memory).toBe(0.31)
   })
 
   it('queues a patch at the selected musical boundary during playback', () => {

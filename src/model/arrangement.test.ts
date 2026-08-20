@@ -58,12 +58,14 @@ describe('arrangement occurrences', () => {
     occurrence.transpose = 12
     composition.arrangement = [occurrence]
     getPattern(composition, 'B').steps[0].notes = ['C4', 'Eb4']
+    getPattern(composition, 'B').steps[0].signal = 'G4'
     getPattern(composition, 'B').steps[0].bass = 'C2'
 
     const resolved = resolveArrangementOccurrence(composition, 0)
 
     expect(resolved.pattern.id).toBe('B')
     expect(transposeOccurrenceNotes(resolved.pattern.steps[0].notes, occurrence)).toEqual(['C5', 'Eb5'])
+    expect(transposeOccurrenceNote(resolved.pattern.steps[0].signal!, occurrence)).toBe('G5')
     expect(transposeOccurrenceNote(resolved.pattern.steps[0].bass!, occurrence)).toBe('C3')
     expect(resolved.pattern.steps[0].notes).toEqual(['C4', 'Eb4'])
   })

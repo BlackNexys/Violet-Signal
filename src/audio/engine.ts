@@ -1,5 +1,5 @@
 import * as Tone from 'tone'
-import { clamp, meterParts, stepsPerBeat, type ApplyQuantization, type Composition, type PatternId, type VoiceId } from '../model/composition'
+import { VOICE_IDS, clamp, meterParts, stepsPerBeat, type ApplyQuantization, type Composition, type PatternId, type VoiceId } from '../model/composition'
 import { occurrenceAllowsVoice, occurrenceLayerSelection, resolveArrangementOccurrence, transposeOccurrenceNote, transposeOccurrenceNotes } from '../model/arrangement'
 import { mapOverclock } from './overclock'
 import { advanceFatigue, resolveSequencerStep } from './sequencing'
@@ -48,8 +48,10 @@ export class VioletAudioEngine {
   private compositionId = ''
   private lastChord: string[] = ['C4', 'Eb4', 'G4']
   private chordTied = false
+  private signalTied = false
   private bassTied = false
   private chordReleasePending = false
+  private signalReleasePending = false
   private bassReleasePending = false
 
   constructor(private readonly callbacks: AudioEngineCallbacks) {}
@@ -72,8 +74,8 @@ export class VioletAudioEngine {
     this.limiter.connect(this.recorder)
     await this.routing.reverb.ready
 
-    for (const id of ['chords', 'bass', 'pulse', 'texture'] as VoiceId[]) this.channels[id] = this.makeChannel(composition, id)
-    for (const id of ['chords', 'bass', 'pulse', 'texture'] as VoiceId[]) {
+    for (const id of VOICE_IDS) this.channels[id] = this.makeChannel(composition, id)
+    for (const id of VOICE_IDS) {
       this.sources[id] = new LayeredVoiceSource(id, this.channels[id]!.filter, composition.voices[id])
     }
 
@@ -98,7 +100,7 @@ export class VioletAudioEngine {
     if (this.routing) updateParallelEffectRouting(this.routing, composition.sound, mapped.drive, masterOutputDb(composition.masterVolume, mapped.outputTrimDb), this.callbacks.getPerformance().freeze)
 
     const anySolo = Object.values(composition.voices).some((voice) => voice.solo)
-    for (const id of ['chords', 'bass', 'pulse', 'texture'] as VoiceId[]) {
+    for (const id of VOICE_IDS) {
       const voice = composition.voices[id]
       const channel = this.channels[id]
       if (!channel) continue
@@ -106,11 +108,11 @@ export class VioletAudioEngine {
       channel.volume.mute = voice.mute || (anySolo && !voice.solo)
       channel.filter.type = voice.filterType
       channel.filter.Q.rampTo(voice.resonance, 0.06)
-      channel.filter.frequency.rampTo(clamp(voice.cutoff * (id === 'chords' ? mapped.brightness : 1), 80, 12000), 0.06)
+      channel.filter.frequency.rampTo(clamp(voice.cutoff * (id === 'chords' || id === 'signal' ? mapped.brightness : 1), 80, 12000), 0.06)
       updateVoiceSendRoute(channel.route, voice.sends)
     }
-    for (const id of ['chords', 'bass', 'pulse', 'texture'] as VoiceId[]) {
-      this.sources[id]?.update(composition.voices[id], id === 'chords'
+    for (const id of VOICE_IDS) {
+      this.sources[id]?.update(composition.voices[id], id === 'chords' || id === 'signal'
         ? { envelopeScale: mapped.envelopeScale, pitchDriftCents: mapped.pitchDriftCents }
         : { envelopeScale: 1, pitchDriftCents: 0 })
     }
@@ -159,6 +161,26 @@ export class VioletAudioEngine {
       this.sources.chords?.trigger(chord, stepDuration * 0.45, jitteredTime, clamp(current.velocity * 0.3, 0.08, 0.78), occurrenceLayerSelection(occurrence, 'chords'))
     }
     this.chordTied = chordLifecycle.held
+
+    const signalAllowed = occurrenceAllowsVoice(composition, occurrence, 'signal')
+    const signalCanSound = Boolean(current.signal) && resolved.shouldPlay && signalAllowed
+    if (this.signalReleasePending) this.sources.signal?.release(signalCanSound ? jitteredTime : time)
+    this.signalReleasePending = false
+    const signalLifecycle = resolvePitchedLifecycle(this.signalTied, signalCanSound, current.signalTie, resolved.ratchets)
+    if (signalLifecycle.releasePrevious) this.sources.signal?.release(signalCanSound ? jitteredTime : time)
+    if (signalCanSound && current.signal) {
+      const intendedDuration = stepDuration * current.signalLength * 0.92
+      const duration = resolved.ratchets > 1 ? Math.min(intendedDuration, ratchetSpacing * 0.82) : intendedDuration
+      const signal = transposeOccurrenceNote(current.signal, occurrence)
+      const velocity = clamp(current.velocity * 0.66, 0.1, 0.72)
+      const selection = occurrenceLayerSelection(occurrence, 'signal')
+      if (signalLifecycle.mode === 'attack') this.sources.signal?.attack(signal, jitteredTime, velocity, selection)
+      else if (signalLifecycle.mode === 'change') {
+        this.sources.signal?.change(signal, jitteredTime, velocity, selection)
+        if (!signalLifecycle.held) this.signalReleasePending = true
+      } else for (const triggerTime of triggerTimes) this.sources.signal?.trigger(signal, duration, triggerTime, velocity, selection)
+    }
+    this.signalTied = signalLifecycle.held
 
     const bassAllowed = occurrenceAllowsVoice(composition, occurrence, 'bass')
     const bassCanSound = Boolean(current.bass) && resolved.shouldPlay && bassAllowed
@@ -214,12 +236,12 @@ export class VioletAudioEngine {
   start(): void { if (this.initialized) Tone.getTransport().start() }
   pause(): void {
     Tone.getTransport().pause(); this.visualGeneration += 1
-    this.chordTied = false; this.bassTied = false; this.chordReleasePending = false; this.bassReleasePending = false
+    this.chordTied = false; this.signalTied = false; this.bassTied = false; this.chordReleasePending = false; this.signalReleasePending = false; this.bassReleasePending = false
     for (const source of Object.values(this.sources)) source.release()
   }
   stop(): void {
     Tone.getTransport().stop(); this.visualGeneration += 1; this.step = 0; this.cycle = 0; this.barIndex = 0
-    this.chordTied = false; this.bassTied = false; this.chordReleasePending = false; this.bassReleasePending = false
+    this.chordTied = false; this.signalTied = false; this.bassTied = false; this.chordReleasePending = false; this.signalReleasePending = false; this.bassReleasePending = false
     for (const source of Object.values(this.sources)) source.release()
     const composition = this.callbacks.getComposition()
     this.callbacks.onPosition(-1, composition.activePatternId, 0)

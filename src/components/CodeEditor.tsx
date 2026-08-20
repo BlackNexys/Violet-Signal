@@ -53,16 +53,16 @@ function matcherPlugin(regexp: RegExp, className: string) {
   }), { decorations: (plugin) => plugin.decorations })
 }
 
-const keywordHighlights = matcherPlugin(/\b(scene|track|format-version|style|style-version|world|influences|tempo|meter|steps|swing|seed|scale|lock|patterns|active|arrangement|transpose|rotate|mute|layers|effects|all|primary|shadow|hold|linear|patch|voice|layer|memory|environment|veil|fracture|ghost|humanize|overclock|output|notes|bass|pulse|texture|emphasis|chance|ratchet|shift|automate)\b/g, 'cm-dsl-keyword')
+const keywordHighlights = matcherPlugin(/\b(scene|track|format-version|style|style-version|world|influences|tempo|meter|steps|swing|seed|scale|lock|patterns|active|arrangement|transpose|rotate|mute|layers|effects|all|primary|shadow|hold|linear|patch|voice|layer|memory|environment|veil|fracture|ghost|humanize|overclock|output|notes|signal|bass|pulse|texture|emphasis|chance|ratchet|shift|automate)\b/g, 'cm-dsl-keyword')
 const noteHighlights = matcherPlugin(/\b[A-G](?:#|b)?-?\d\b/g, 'cm-dsl-note')
 const patternHighlights = matcherPlugin(/\b(?:A|B|C|D)\b/g, 'cm-dsl-pattern')
 
 const completions = [
-  'format-version: 3', ...STYLE_DEFINITIONS.map((style) => `style: ${style.id}`), 'style-version: 1', 'influences: ambient=0.25', 'tempo: ', 'meter: 4/4', 'steps: 16', 'swing: 0.08', 'seed: ', ...SCALE_MODES.map((mode) => `scale: C ${mode}`), 'lock: on', 'patterns: A B C D', 'active: A',
+  'format-version: 4', ...STYLE_DEFINITIONS.map((style) => `style: ${style.id}`), 'style-version: 1', 'influences: ambient=0.25', 'tempo: ', 'meter: 4/4', 'steps: 16', 'swing: 0.08', 'seed: ', ...SCALE_MODES.map((mode) => `scale: C ${mode}`), 'lock: on', 'patterns: A B C D', 'active: A',
   ...INSTRUMENT_PATCHES.map((patch) => `patch ${patch.role}: ${patch.id}`),
   'arrangement: A A[transpose=12,rotate=2] B[mute=pulse,effects=memory:0.2+veil:-0.1] C[layers=chords:shadow]', 'voice chords: triangle engine=subtractive octave=0 detune=0 layer-level=0 character=0.28 attack-scale=1 release-scale=1 filter=lowpass cutoff=2800 resonance=0.8 glide=0 volume=-10 attack=0.05 decay=0.38 sustain=0.58 release=1.4 send-fracture=1 send-veil=0.7 send-memory=0.8 send-environment=0.9 mute=off solo=off',
   'layer chords shadow: off engine=subtractive waveform=triangle octave=0 detune=0 level=-18 character=0.28 attack-scale=1 release-scale=1',
-  'notes A: 01=C4+Eb4+G4> 02=D4+F4+A4', 'bass A: 01=C2> 02=D2', 'pulse A: 01 05 09 13', 'texture A: none',
+  'notes A: 01=C4+Eb4+G4> 02=D4+F4+A4', 'signal A: 03=G4> 04=Ab4', 'bass A: 01=C2> 02=D2', 'pulse A: 01 05 09 13', 'texture A: none',
   'chance A: 07=0.65', 'ratchet A: 15=3', 'shift A: 03=-0.08',
   'automate mask A: 01=1200 09=4200', 'automate veil A linear: 01=0.2 09=0.7', 'automate fracture A linear: 01=0.05 13=0.65',
   'memory: 0.28', 'environment: 0.2', 'veil: 0.35', 'fracture: 0.08', 'ghost: 0.12', 'humanize: 0.03', 'overclock: 0',

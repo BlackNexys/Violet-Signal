@@ -56,6 +56,11 @@ export async function renderCompositionToWav(composition: Composition): Promise<
     const chordFilter = new Tone.Filter({ frequency: chordVoice.cutoff, type: chordVoice.filterType, rolloff: -24, Q: chordVoice.resonance }).connect(chordVolume)
     createVoiceSendRoute(chordVolume, routing, chordVoice.sends)
     const chords = new LayeredVoiceSource('chords', chordFilter, chordVoice, { envelopeScale: mapped.envelopeScale, pitchDriftCents: mapped.pitchDriftCents })
+    const signalVoice = composition.voices.signal
+    const signalVolume = new Tone.Volume(signalVoice.volume)
+    const signalFilter = new Tone.Filter({ frequency: signalVoice.cutoff, type: signalVoice.filterType, rolloff: -24, Q: signalVoice.resonance }).connect(signalVolume)
+    createVoiceSendRoute(signalVolume, routing, signalVoice.sends)
+    const signal = new LayeredVoiceSource('signal', signalFilter, signalVoice, { envelopeScale: mapped.envelopeScale, pitchDriftCents: mapped.pitchDriftCents })
     const bassVoice = composition.voices.bass
     const bassVolume = new Tone.Volume(bassVoice.volume)
     const bassFilter = new Tone.Filter({ frequency: bassVoice.cutoff, type: bassVoice.filterType, rolloff: -24, Q: bassVoice.resonance }).connect(bassVolume)
@@ -74,8 +79,10 @@ export async function renderCompositionToWav(composition: Composition): Promise<
 
     let lastChord = ['C4', 'Eb4', 'G4']
     let chordTied = false
+    let signalTied = false
     let bassTied = false
     let chordReleasePending = false
+    let signalReleasePending = false
     let bassReleasePending = false
     let fatigue: FatigueState = { heat: 0, exhaustion: 0 }
     let stepCursor = 0
@@ -113,6 +120,26 @@ export async function renderCompositionToWav(composition: Composition): Promise<
         }
         chordTied = chordLifecycle.held
 
+        const signalAllowed = occurrenceAllowsVoice(composition, occurrence, 'signal')
+        const signalCanSound = Boolean(step.signal) && resolved.shouldPlay && signalAllowed
+        if (signalReleasePending) signal.release(signalCanSound ? eventTime : time)
+        signalReleasePending = false
+        const signalLifecycle = resolvePitchedLifecycle(signalTied, signalCanSound, step.signalTie, resolved.ratchets)
+        if (signalLifecycle.releasePrevious) signal.release(signalCanSound ? eventTime : time)
+        if (signalCanSound && step.signal) {
+          const intendedDuration = secondsPerStep * step.signalLength * 0.92
+          const noteDuration = resolved.ratchets > 1 ? Math.min(intendedDuration, ratchetSpacing * 0.82) : intendedDuration
+          const signalNote = transposeOccurrenceNote(step.signal, occurrence)
+          const velocity = clamp(step.velocity * 0.66, 0.1, 0.72)
+          const selection = occurrenceLayerSelection(occurrence, 'signal')
+          if (signalLifecycle.mode === 'attack') signal.attack(signalNote, eventTime, velocity, selection)
+          else if (signalLifecycle.mode === 'change') {
+            signal.change(signalNote, eventTime, velocity, selection)
+            if (!signalLifecycle.held) signalReleasePending = true
+          } else for (const triggerTime of triggerTimes) signal.trigger(signalNote, noteDuration, triggerTime, velocity, selection)
+        }
+        signalTied = signalLifecycle.held
+
         const bassAllowed = occurrenceAllowsVoice(composition, occurrence, 'bass')
         const bassCanSound = Boolean(step.bass) && resolved.shouldPlay && bassAllowed
         if (bassReleasePending) bass.release(bassCanSound ? eventTime : time)
@@ -143,6 +170,7 @@ export async function renderCompositionToWav(composition: Composition): Promise<
       stepCursor += pattern.steps.length
     })
     chords.release(stepCursor * secondsPerStep)
+    signal.release(stepCursor * secondsPerStep)
     bass.release(stepCursor * secondsPerStep)
   }, duration, 2, 44_100)
   const audioBuffer = rendered.get()

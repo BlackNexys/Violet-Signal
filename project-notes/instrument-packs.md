@@ -1,10 +1,10 @@
 # Violet Signal instrument packs
 
-Status: expanded engine vocabulary implemented 2026-08-20.
+Status: expanded engine vocabulary and Signal role implemented 2026-08-20.
 
 ## Mental model
 
-Violet Signal still has four musical voices: Chord, Bass, Pulse, and Texture. Each voice now mixes a required **Primary** source with an optional **Shadow** source before entering its existing channel filter and level.
+Violet Signal has five musical voices: Chord, Signal, Bass, Pulse, and Texture. Signal is the independent monophonic lead role. Each voice mixes a required **Primary** source with an optional **Shadow** source before entering its channel filter and level.
 
 ```text
 sequencer event -> Primary + Shadow -> voice filter/level -> dry bus --------|
@@ -22,17 +22,17 @@ This adds timbral depth without adding sequencer lanes. Mute, solo, Mask automat
 - Shadow disabled;
 - no patch provenance.
 
-The migration runs through `cloneComposition`, so scenes, IndexedDB snapshots, undo history, and imported project objects share one normalization path. The safe notation parser continues accepting legacy voice lines. The current format is v3 because arrangement occurrences were added later; v2 layer data remains unchanged and canonical v3 notation includes it explicitly.
+The migration runs through `cloneComposition`, so scenes, IndexedDB snapshots, undo history, and imported project objects share one normalization path. The safe notation parser continues accepting legacy voice lines. Format v3 added arrangement occurrences. The current format is v4: older projects gain a calibrated Signal voice and an empty Signal lane, preserving their exact authored sound until Signal notes are added.
 
 ## Engine compatibility
 
 | Engine | Roles | Tone source |
 | --- | --- | --- |
-| `subtractive` | Chord, Bass | `PolySynth(Synth)` / `MonoSynth` |
-| `fm` | Chord, Bass | `PolySynth(FMSynth)` / `FMSynth` |
-| `am` | Chord, Bass | `PolySynth(AMSynth)` / `AMSynth` |
-| `dual` | Chord, Bass | `PolySynth(DuoSynth)` / `DuoSynth` |
-| `pluck` | Chord, Bass | managed `PluckSynth` pool |
+| `subtractive` | Chord, Signal, Bass | `PolySynth(Synth)` / `MonoSynth` |
+| `fm` | Chord, Signal, Bass | `PolySynth(FMSynth)` / `FMSynth` |
+| `am` | Chord, Signal, Bass | `PolySynth(AMSynth)` / `AMSynth` |
+| `dual` | Chord, Signal, Bass | `PolySynth(DuoSynth)` / `DuoSynth` |
+| `pluck` | Chord, Signal, Bass | managed `PluckSynth` pool |
 | `membrane` | Pulse | `MembraneSynth` |
 | `metal` | Pulse, Texture | `MetalSynth` |
 | `noise` | Pulse, Texture | `NoiseSynth` |
@@ -49,10 +49,10 @@ Built-in definitions live in `src/model/instrumentPacks.ts`. A pack supplies ide
 
 The first registry contains:
 
-- **Blacklight Core** — Quiet Circuit, Underline, Heart Signal, and Rain Carrier reproduce the calibrated original voices.
-- **Veil Archive** — Glass Choir combines an AM Primary with a quiet octave-up FM Shadow; Undertow combines a sine subtractive bass with a restrained FM Shadow.
+- **Blacklight Core** — Quiet Circuit, Carrier Line, Underline, Heart Signal, and Rain Carrier provide the calibrated starting voices.
+- **Veil Archive** — Glass Choir combines an AM Primary with a quiet octave-up FM Shadow; Undertow combines a sine subtractive bass with a restrained FM Shadow; Cold Beacon gives Signal a glassy AM/FM lead.
 - **Chrome Wound** — Razor Assembly and Reactor use dual oscillators; Iron Pulse and Arc Ash combine membrane, metal, and noise layers.
-- **Fractured Relay** — Wire Below provides a managed physical-pluck bass; Relay Click provides a clipped metallic transient.
+- **Fractured Relay** — Wire Below provides a managed physical-pluck bass; Needle Light gives Signal a plucked lead; Relay Click provides a clipped metallic transient.
 
 Patch ids use `pack-id/patch-id@version`. Applying a patch copies its complete sound settings into the composition while preserving that voice's four effect sends. Playback never requires a registry lookup, so a future pack revision cannot silently alter an existing project. Changing a sound-defining layer, filter, envelope, or channel value clears provenance to **Custom**; routing sends, mute, and solo do not.
 
@@ -71,7 +71,7 @@ External pack import is intentionally out of scope. When added, it must validate
 
 `src/audio/instrumentSource.ts` is shared by live and offline rendering. It owns engine construction, Character mapping, pitch transposition, layer gain, envelope response scaling, one-shot triggering, tied attack/pitch-change/release lifecycles, and disposal. The live engine may rebuild a source when its engine changes; all other safe updates are applied to the existing source.
 
-The browser smoke test applies dual, pluck, and metal patches across all four voices and renders them together through the production offline WAV path. Node unit tests cover mappings, compatibility, notation, and data behavior; the actual Node offline audio test is conditionally skipped when the runtime has no native `OfflineAudioContext`.
+The browser smoke test authors a tied Signal phrase, applies dual, pluck, and metal patches across all five voices, and renders them together through the production offline WAV path. Node unit tests cover mappings, compatibility, notation, migration, and data behavior; the actual Node offline audio test is conditionally skipped when the runtime has no native `OfflineAudioContext`.
 
 ## Current boundaries
 

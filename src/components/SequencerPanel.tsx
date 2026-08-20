@@ -212,6 +212,16 @@ export function SequencerPanel() {
             </button>
           ))}
 
+          <div className="lane-label"><span>Signal</span><small>Lead voice</small></div>
+          {pattern.steps.map((step, index) => (
+            <button type="button" key={`signal-${index}`}
+              className={`step-cell signal-cell${step.signal ? ' is-active' : ''}${step.signalTie ? ' is-tied' : ''}${activeStep === index && playingPatternId === pattern.id ? ' is-current' : ''}${inspectedStep === index && selectedLane === 'signal' ? ' is-selected' : ''}`}
+              aria-label={`Step ${index + 1} signal: ${step.signal ?? 'silent'}${step.signalTie ? ', tied to next step' : ''}`} aria-pressed={inspectedStep === index && selectedLane === 'signal'}
+              onClick={() => selectLane(index, 'signal')}>
+              <span>{step.signal?.replace(/-?\d/, '') ?? '·'}</span>{step.signal && (step.signalLength > 1 || step.signalTie) && <small>{step.signalLength > 1 ? step.signalLength : ''}{step.signalTie ? '→' : ''}</small>}
+            </button>
+          ))}
+
           <div className="lane-label"><span>Bass</span><small>Mono voice</small></div>
           {pattern.steps.map((step, index) => (
             <button type="button" key={`bass-${index}`}
@@ -254,7 +264,7 @@ export function SequencerPanel() {
           <button type="button" className="clear-step" onClick={clearSelectedLane}><Trash2 size={12} /> Clear {selectedLane}</button>
         </div>
         <div className="lane-picker" aria-label="Step lane">
-          {(['notes', 'bass', 'drum', 'texture'] as StepLane[]).map((lane) => <button type="button" key={lane} className={selectedLane === lane ? 'is-active' : ''} onClick={() => selectStep(inspectedStep, lane)}>{lane === 'notes' ? 'Chord' : lane === 'drum' ? 'Pulse' : lane}</button>)}
+          {(['notes', 'signal', 'bass', 'drum', 'texture'] as StepLane[]).map((lane) => <button type="button" key={lane} className={selectedLane === lane ? 'is-active' : ''} onClick={() => selectStep(inspectedStep, lane)}>{lane === 'notes' ? 'Chord' : lane === 'drum' ? 'Pulse' : lane[0].toUpperCase() + lane.slice(1)}</button>)}
         </div>
         {selectedLane === 'notes' && (
           <div className="note-assignment">
@@ -262,11 +272,12 @@ export function SequencerPanel() {
             <div className="chord-suggestions">{suggestions.map((chord) => <button type="button" key={chord.name} title={chord.notes.join(' ')} onClick={() => setChord(chord.notes)}>{chord.name}</button>)}</div>
           </div>
         )}
+        {selectedLane === 'signal' && <div className="note-chips">{selected.signal ? <button type="button" onClick={clearSelectedLane}>{selected.signal} ×</button> : <span>No Signal note—use the touch keys.</span>}</div>}
         {selectedLane === 'bass' && <div className="note-chips">{selected.bass ? <button type="button" onClick={clearSelectedLane}>{selected.bass} ×</button> : <span>No bass note—use the touch keys.</span>}</div>}
-        {(selectedLane === 'notes' || selectedLane === 'bass') && (
+        {(selectedLane === 'notes' || selectedLane === 'signal' || selectedLane === 'bass') && (
           <div className="pitched-lifecycle-controls">
-            <label className="length-control">Length <select value={selectedLane === 'notes' ? selected.chordLength : selected.bassLength} onChange={(event) => setStepLength(selectedLane as NoteLane, Number(event.target.value))}>{[1, 2, 3, 4, 8].map((length) => <option key={length} value={length}>{length} step{length > 1 ? 's' : ''}</option>)}</select></label>
-            <label className="tie-control"><input type="checkbox" disabled={selectedLane === 'notes' ? selected.notes.length === 0 : !selected.bass} checked={selectedLane === 'notes' ? selected.chordTie : selected.bassTie} onChange={(event) => setStepTie(selectedLane as NoteLane, event.target.checked)} /> Tie to next step <small>Legato</small></label>
+            <label className="length-control">Length <select value={selectedLane === 'notes' ? selected.chordLength : selectedLane === 'signal' ? selected.signalLength : selected.bassLength} onChange={(event) => setStepLength(selectedLane as NoteLane, Number(event.target.value))}>{[1, 2, 3, 4, 8].map((length) => <option key={length} value={length}>{length} step{length > 1 ? 's' : ''}</option>)}</select></label>
+            <label className="tie-control"><input type="checkbox" disabled={selectedLane === 'notes' ? selected.notes.length === 0 : selectedLane === 'signal' ? !selected.signal : !selected.bass} checked={selectedLane === 'notes' ? selected.chordTie : selectedLane === 'signal' ? selected.signalTie : selected.bassTie} onChange={(event) => setStepTie(selectedLane as NoteLane, event.target.checked)} /> Tie to next step <small>Legato</small></label>
           </div>
         )}
         <div className="step-expression">
