@@ -7,6 +7,7 @@ function harness(initialFiles: Record<string, string> = {}) {
   const files = new Map(Object.entries(initialFiles))
   let stdout = ''
   let stderr = ''
+  const renders: Array<{ source: string; outputPath: string }> = []
   const io: CliIo = {
     readFile: async (path) => {
       const contents = files.get(path)
@@ -14,12 +15,14 @@ function harness(initialFiles: Record<string, string> = {}) {
       return contents
     },
     writeFile: async (path, contents) => { files.set(path, contents) },
+    renderFile: async (source, outputPath) => { renders.push({ source, outputPath }) },
     stdout: (contents) => { stdout += contents },
     stderr: (contents) => { stderr += contents },
   }
   return {
     io,
     files,
+    renders,
     stdout: () => stdout,
     stderr: () => stderr,
   }
@@ -106,6 +109,37 @@ describe('Violet CLI', () => {
     expect(usage.stderr()).toContain('VIOLET_USAGE')
     expect(await runCli(['validate', 'missing.violet'], missing.io, '0.1.0')).toBe(2)
     expect(missing.stderr()).toContain('VIOLET_IO_ERROR')
+  })
+
+  it('renders validated canonical notation to the requested output', async () => {
+    const test = harness({ 'signal.violet': canonical.replace(/\n/g, '\r\n') })
+
+    const exitCode = await runCli(['render', 'signal.violet', '--out', 'signal.wav', '--json'], test.io, '0.1.0')
+
+    expect(exitCode).toBe(0)
+    expect(test.renders).toEqual([{ source: canonical, outputPath: 'signal.wav' }])
+    expect(JSON.parse(test.stdout())).toEqual({ ok: true, diagnostics: [], output: 'signal.wav' })
+  })
+
+  it('does not initialize rendering for invalid notation', async () => {
+    const test = harness({ 'broken.violet': 'not violet' })
+
+    const exitCode = await runCli(['render', 'broken.violet', '--out', 'broken.wav'], test.io, '0.1.0')
+
+    expect(exitCode).toBe(1)
+    expect(test.renders).toHaveLength(0)
+    expect(test.stderr()).toContain('VIOLET_PARSE_ERROR')
+  })
+
+  it('reports render failures and missing output paths with stable diagnostics', async () => {
+    const failed = harness({ 'signal.violet': canonical })
+    failed.io.renderFile = async () => { throw new Error('Chrome unavailable') }
+    const usage = harness({ 'signal.violet': canonical })
+
+    expect(await runCli(['render', 'signal.violet', '--out', 'signal.wav', '--json'], failed.io, '0.1.0')).toBe(2)
+    expect(JSON.parse(failed.stdout()).diagnostics[0].code).toBe('VIOLET_RENDER_ERROR')
+    expect(await runCli(['render', 'signal.violet'], usage.io, '0.1.0')).toBe(2)
+    expect(usage.stderr()).toContain('VIOLET_USAGE')
   })
 
   it('maps unexpected failures to a stable internal diagnostic', async () => {

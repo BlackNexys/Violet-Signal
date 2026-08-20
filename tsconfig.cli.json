@@ -13,5 +13,5 @@
     "noUnusedParameters": true,
     "types": ["node"]
   },
-  "include": ["cli"]
+  "include": ["cli/core.ts", "cli/core.test.ts", "cli/render.ts", "cli/violet.ts"]
 }

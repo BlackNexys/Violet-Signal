@@ -51,9 +51,9 @@ npm run lint
 npm run build
 ```
 
-### Validate and format notation from the command line
+### Validate, format, and render notation from the command line
 
-The production build includes a headless `violet` executable that reuses the app's bounded parser and canonical serializer without initializing Tone.js or a browser:
+The production build includes a headless `violet` executable. Validation and formatting reuse the app's bounded parser and canonical serializer without initializing Tone.js or a browser; rendering drives the production offline audio path in a temporary headless-browser session:
 
 ```bash
 npm run build:cli
@@ -61,9 +61,10 @@ node dist-cli/violet.js validate composition.violet
 node dist-cli/violet.js validate composition.violet --json
 node dist-cli/violet.js format composition.violet --check
 node dist-cli/violet.js format composition.violet --write
+node dist-cli/violet.js render composition.violet --out composition.wav
 ```
 
-`format` prints canonical notation by default. `--check` makes no changes and exits `1` when formatting differs; `--write` updates only the named file. Successful commands exit `0`, notation failures exit `1`, and usage, read, or write failures exit `2`. When the package is installed through a package manager, its binary name is `violet`.
+`format` prints canonical notation by default. `--check` makes no changes and exits `1` when formatting differs; `--write` updates only the named file. `render` requires an installed Google Chrome or Microsoft Edge and produces the same stereo, normalized 44.1 kHz PCM WAV as the app. Set `VIOLET_CHROME_PATH` when the browser is outside its standard installation location. Successful commands exit `0`, notation failures exit `1`, and usage, I/O, browser, or rendering failures exit `2`. Add `--json` to any file command for machine-readable output. When the package is installed through a package manager, its binary name is `violet`.
 
 The reusable production-browser smoke test expects `vite preview` at `http://127.0.0.1:4173`:
 
@@ -185,4 +186,4 @@ The audio graph is created only after a user gesture. A shared source factory bu
 
 ## Next valuable milestone
 
-Add headless-browser `violet render` using the production offline audio path, then extend arrangement occurrences with whole-memory rotation. The adopted sequence—including scale modes, engine vocabulary, interpolated automation, ties, and per-voice effect sends—is maintained in [`notes/instrument-sound-and-layer-expansion-plan.md`](notes/instrument-sound-and-layer-expansion-plan.md).
+Add Dorian, Phrygian, harmonic minor, melodic minor, and pentatonic scale modes, then complete the profiling gate for dual, metal, and pluck engines. The adopted sequence—including occurrence rotation, interpolated automation, ties, and per-voice effect sends—is maintained in [`notes/instrument-sound-and-layer-expansion-plan.md`](notes/instrument-sound-and-layer-expansion-plan.md).

@@ -12,6 +12,7 @@ export default defineConfig({
     rollupOptions: {
       output: {
         entryFileNames: 'violet.js',
+        chunkFileNames: 'chunks/[name]-[hash].js',
       },
     },
   },

@@ -11,3 +11,5 @@ WAV output is stereo, 44.1 kHz, 16-bit PCM. After rendering, the highest absolut
 Peak normalization is not full mastering or LUFS normalization. Material with very sharp transients can still sound quieter than heavily compressed commercial music even when both peak at `−1 dBFS`.
 
 The WAV represents the written composition. Temporary live gestures such as Pressure and Freeze Memory are intentionally excluded; use live WebM capture when those gestures are part of the performance.
+
+The packaged `violet render <input.violet> --out <output.wav>` command exposes this exact renderer to scripts and CI. Node validates and canonicalizes the composition before starting a loopback-only static server and a temporary headless Chrome or Edge session. The browser downloads the generated Blob directly to the requested path, avoiding a large audio transfer through the automation protocol. Browser discovery checks `VIOLET_CHROME_PATH`, `CHROME_PATH`, and standard installation locations; the browser and local server are always closed after success or failure.

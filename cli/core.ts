@@ -4,7 +4,7 @@ import { serializeComposition } from '../src/dsl/serializer'
 export type CliExitCode = 0 | 1 | 2
 
 export interface CliDiagnostic {
-  code: 'VIOLET_INTERNAL_ERROR' | 'VIOLET_IO_ERROR' | 'VIOLET_NOT_FORMATTED' | 'VIOLET_PARSE_ERROR' | 'VIOLET_USAGE'
+  code: 'VIOLET_INTERNAL_ERROR' | 'VIOLET_IO_ERROR' | 'VIOLET_NOT_FORMATTED' | 'VIOLET_PARSE_ERROR' | 'VIOLET_RENDER_ERROR' | 'VIOLET_USAGE'
   message: string
   file?: string
   line?: number
@@ -14,6 +14,7 @@ export interface CliDiagnostic {
 export interface CliIo {
   readFile(path: string): Promise<string>
   writeFile(path: string, contents: string): Promise<void>
+  renderFile(source: string, outputPath: string, inputPath: string): Promise<void>
   stdout(contents: string): void
   stderr(contents: string): void
 }
@@ -22,6 +23,7 @@ interface MachineResult {
   ok: boolean
   diagnostics: CliDiagnostic[]
   formatted?: string
+  output?: string
 }
 
 interface ParsedOptions {
@@ -29,6 +31,7 @@ interface ParsedOptions {
   json: boolean
   check: boolean
   write: boolean
+  output?: string
 }
 
 export const CLI_HELP = `Violet Signal notation tools
@@ -36,12 +39,14 @@ export const CLI_HELP = `Violet Signal notation tools
 Usage:
   violet validate <input.violet> [--json]
   violet format <input.violet> [--check | --write] [--json]
+  violet render <input.violet> --out <output.wav> [--json]
   violet --help
   violet --version
 
 Commands:
   validate  Parse and validate a composition without changing it.
   format    Print canonical notation, check it, or write it in place.
+  render    Render a composition to a stereo WAV using Chrome or Edge.
 `
 
 function errorMessage(error: unknown): string {
@@ -66,16 +71,26 @@ function reportFailure(io: CliIo, diagnostic: CliDiagnostic, json: boolean, exit
   return exitCode
 }
 
-function parseOptions(command: 'validate' | 'format', args: string[]): ParsedOptions | CliDiagnostic {
+function parseOptions(command: 'validate' | 'format' | 'render', args: string[]): ParsedOptions | CliDiagnostic {
   let file: string | undefined
   let json = false
   let check = false
   let write = false
+  let output: string | undefined
 
-  for (const argument of args) {
+  for (let index = 0; index < args.length; index += 1) {
+    const argument = args[index]
     if (argument === '--json') json = true
     else if (command === 'format' && argument === '--check') check = true
     else if (command === 'format' && argument === '--write') write = true
+    else if (command === 'render' && argument === '--out') {
+      const value = args[index + 1]
+      if (!value || value.startsWith('-')) {
+        return { code: 'VIOLET_USAGE', message: 'Pass a WAV file path after --out.' }
+      }
+      output = value
+      index += 1
+    }
     else if (argument.startsWith('-')) {
       return { code: 'VIOLET_USAGE', message: `Unknown option “${argument}”.` }
     } else if (file) {
@@ -85,7 +100,9 @@ function parseOptions(command: 'validate' | 'format', args: string[]): ParsedOpt
 
   if (!file) return { code: 'VIOLET_USAGE', message: 'Pass one .violet input file.' }
   if (check && write) return { code: 'VIOLET_USAGE', message: 'Choose either --check or --write, not both.' }
-  return { file, json, check, write }
+  if (command === 'render' && !output) return { code: 'VIOLET_USAGE', message: 'Render requires --out <output.wav>.' }
+  if (command === 'render' && output === file) return { code: 'VIOLET_USAGE', message: 'The render output must differ from the input file.' }
+  return { file, json, check, write, output }
 }
 
 async function loadCanonicalFile(
@@ -171,6 +188,28 @@ async function format(options: ParsedOptions, io: CliIo): Promise<CliExitCode> {
   return 0
 }
 
+async function render(options: ParsedOptions, io: CliIo): Promise<CliExitCode> {
+  const loaded = await loadCanonicalFile(options.file, io)
+  if (isDiagnostic(loaded)) {
+    return reportFailure(io, loaded, options.json, loaded.code === 'VIOLET_IO_ERROR' ? 2 : 1)
+  }
+
+  const output = options.output as string
+  try {
+    await io.renderFile(loaded.canonical, output, options.file)
+  } catch (error) {
+    return reportFailure(io, {
+      code: 'VIOLET_RENDER_ERROR',
+      message: `Could not render the composition: ${errorMessage(error)}`,
+      file: options.file,
+    }, options.json, 2)
+  }
+
+  if (options.json) writeMachineResult(io, { ok: true, diagnostics: [], output })
+  else io.stdout(`${output}: rendered\n`)
+  return 0
+}
+
 async function executeCli(args: string[], io: CliIo, version: string): Promise<CliExitCode> {
   if (args.length === 0 || args.includes('--help') || args[0] === 'help') {
     io.stdout(CLI_HELP)
@@ -182,16 +221,18 @@ async function executeCli(args: string[], io: CliIo, version: string): Promise<C
   }
 
   const command = args[0]
-  if (command !== 'validate' && command !== 'format') {
+  if (command !== 'validate' && command !== 'format' && command !== 'render') {
     return reportFailure(io, {
       code: 'VIOLET_USAGE',
-      message: `Unknown command “${command}”. Use validate or format.`,
+      message: `Unknown command “${command}”. Use validate, format, or render.`,
     }, args.includes('--json'), 2)
   }
 
   const options = parseOptions(command, args.slice(1))
   if ('code' in options) return reportFailure(io, options, args.includes('--json'), 2)
-  return command === 'validate' ? validate(options, io) : format(options, io)
+  if (command === 'validate') return validate(options, io)
+  if (command === 'format') return format(options, io)
+  return render(options, io)
 }
 
 export async function runCli(args: string[], io: CliIo, version: string): Promise<CliExitCode> {

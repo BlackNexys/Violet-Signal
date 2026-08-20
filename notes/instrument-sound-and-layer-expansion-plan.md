@@ -1,6 +1,6 @@
 # Instrument Sound and Layer Expansion Plan
 
-Status: in progress — CLI foundation and first arrangement-occurrence slice completed
+Status: in progress — CLI rendering and first arrangement-occurrence slice completed
 Date: 2026-08-19  
 Last planning update: 2026-08-20
 Last implementation update: 2026-08-20
@@ -15,7 +15,7 @@ The first vertical slice is implemented:
 - Patch selection, editable layer controls, Custom provenance, undo/redo, and queued playback-boundary application.
 - Safe notation, CodeMirror support, IndexedDB/project normalization, documentation, and production-browser layered WAV coverage.
 
-The headless validation and formatting CLI is implemented with human-readable and JSON diagnostics, canonical check/write modes, stable exit codes, a separate Node-targeted bundle, and integration coverage. Format v3 arrangement occurrences are also implemented with transpose, per-voice mute, Primary/Shadow selection, legacy migration, notation, UI editing, and shared live/offline resolution. Headless-browser rendering is next. The Phase 0 profiling gate for dual, metal, and pluck remains planned after that; Chrome Wound, Fractured Relay, and Low Cinema remain later content work.
+The headless CLI is implemented with validation, canonical formatting, human-readable and JSON diagnostics, stable exit codes, and production-path WAV rendering through an installed Chrome or Edge browser. Its packaged executable is covered end to end. Format v3 arrangement occurrences are also implemented with transpose, per-voice mute, Primary/Shadow selection, legacy migration, notation, UI editing, and shared live/offline resolution. Scale modes and the Phase 0 profiling gate for dual, metal, and pluck are next; Chrome Wound, Fractured Relay, and Low Cinema remain later content work.
 
 ## Post-v2 feedback roadmap
 
@@ -45,7 +45,7 @@ The adopted priorities are:
 
 ## Milestone A — Headless CLI foundation
 
-Status: completed 2026-08-20 (`validate` and `format`); headless-browser `render` remains a later CLI milestone.
+Status: completed 2026-08-20, including headless-browser `render`.
 
 The first deliverable is a small executable surface over the existing pure parser and serializer:
 
@@ -55,7 +55,7 @@ violet format <input.violet> [--check | --write]
 violet render <input.violet> --out <output.wav>
 ```
 
-Deliver `validate` and `format` first. They should not initialize Tone.js or require a browser.
+`validate` and `format` do not initialize Tone.js or require a browser. `render` loads its browser dependency only after the input has parsed successfully.
 
 ### CLI contract
 
@@ -67,7 +67,7 @@ Deliver `validate` and `format` first. They should not initialize Tone.js or req
 - `format --write` uses canonical serialization and changes only the explicitly named file.
 - Standard input/output support may follow after the file contract is stable.
 
-`render` is part of the same public command family but is a second CLI milestone. The current offline renderer relies on Web Audio and the Node test environment does not provide a native `OfflineAudioContext`. The first headless renderer should therefore drive the existing production-browser renderer through headless Chromium, preserving the already-tested audio path. A native Node audio backend should only be considered later if its maintenance and parity cost is justified.
+`render` drives the existing production-browser renderer through headless Chrome or Edge because the Node runtime does not provide a native `OfflineAudioContext`. The browser worker is packaged beside the Node executable, uses a loopback-only server, and saves the WAV download without transferring its bytes through the browser automation protocol. A native Node audio backend should only be considered later if its maintenance and parity cost is justified.
 
 Exit criteria:
 
@@ -212,7 +212,7 @@ Its design checkpoint must decide whether Signal receives its own pattern lane, 
 1. **Completed:** Package `violet validate` and `violet format` with stable diagnostics.
 2. **Completed:** Specify format-v3 arrangement occurrences and build the shared occurrence resolver.
 3. **Completed:** Ship transpose, occurrence mute, and Primary/Shadow selection end to end.
-4. Add headless-browser `violet render` and verify WAV parity.
+4. **Completed:** Add headless-browser `violet render` and verify the packaged WAV path.
 5. Add scale modes and complete dual, metal, and pluck profiling and patches.
 6. Add occurrence rotation and bounded effect modifiers.
 7. Add Hold/Linear automation interpolation.

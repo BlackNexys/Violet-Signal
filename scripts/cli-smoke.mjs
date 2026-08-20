@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict'
 import { spawnSync } from 'node:child_process'
-import { readFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
@@ -32,5 +34,22 @@ assert.equal(await readFile(validFixture, 'utf8'), original)
 const version = run('--version')
 assert.equal(version.status, 0, version.stderr)
 assert.match(version.stdout, /^\d+\.\d+\.\d+\n$/)
+
+const renderDirectory = await mkdtemp(join(tmpdir(), 'violet-cli-'))
+try {
+  const output = join(renderDirectory, 'signal.wav')
+  const rendered = run('render', validFixture, '--out', output, '--json')
+  assert.equal(rendered.status, 0, rendered.stderr)
+  assert.deepEqual(JSON.parse(rendered.stdout), { ok: true, diagnostics: [], output })
+  const wav = await readFile(output)
+  assert.equal(wav.subarray(0, 4).toString('ascii'), 'RIFF')
+  assert.equal(wav.subarray(8, 12).toString('ascii'), 'WAVE')
+  assert.ok(wav.length > 44, 'rendered WAV contains no audio frames')
+} finally {
+  const resolvedTempRoot = resolve(tmpdir())
+  const resolvedRenderDirectory = resolve(renderDirectory)
+  assert.ok(resolvedRenderDirectory.startsWith(`${resolvedTempRoot}${sep}`), 'refusing to clean outside the temporary directory')
+  await rm(resolvedRenderDirectory, { recursive: true })
+}
 
 console.log('CLI smoke test passed.')
