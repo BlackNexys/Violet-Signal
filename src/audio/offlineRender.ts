@@ -8,6 +8,7 @@ import { LIMITER_CEILING_DB, masterOutputDb, memoryDelaySeconds } from './signal
 import { LayeredVoiceSource } from './instrumentSource'
 import { resolvePendingRelease, resolvePitchedLifecycle } from './legato'
 import { createParallelEffectRouting, createVoiceSendRoute, setParallelEffectRoutingAtTime } from './effectRouting'
+import { extractLoopChannels, planLoopExport, WAV_SAMPLE_RATE, type WavRenderOptions } from './loopExport'
 
 function encodeWav(buffer: AudioBuffer, gain: number): Blob {
   const channels = Math.min(2, buffer.numberOfChannels)
@@ -42,10 +43,15 @@ function encodeWav(buffer: AudioBuffer, gain: number): Blob {
   return new Blob([arrayBuffer], { type: 'audio/wav' })
 }
 
-export async function renderCompositionToWav(composition: Composition): Promise<Blob> {
+export async function renderCompositionToWav(composition: Composition, options: WavRenderOptions = {}): Promise<Blob> {
+  const loop = planLoopExport(composition, options)
+  const scheduledOccurrences = loop
+    ? Array.from({ length: loop.warmupCycles + 1 }, () => loop.occurrences).flat()
+    : composition.arrangement
+  const scheduledComposition = { ...composition, arrangement: scheduledOccurrences }
   const secondsPerStep = 60 / composition.bpm / 4
-  const totalSteps = composition.arrangement.reduce((sum, occurrence) => sum + getPattern(composition, occurrence.pattern).steps.length, 0)
-  const duration = totalSteps * secondsPerStep + 4
+  const totalSteps = scheduledOccurrences.reduce((sum, occurrence) => sum + getPattern(composition, occurrence.pattern).steps.length, 0)
+  const duration = totalSteps * secondsPerStep + (loop ? 0 : 4)
   const rendered = await Tone.Offline(async () => {
     const mapped = mapOverclock(composition.sound.overclock)
     const limiter = new Tone.Limiter(LIMITER_CEILING_DB).toDestination()
@@ -86,11 +92,13 @@ export async function renderCompositionToWav(composition: Composition): Promise<
     let bassReleaseAt: number | null = null
     let fatigue: FatigueState = { heat: 0, exhaustion: 0 }
     let stepCursor = 0
-    composition.arrangement.forEach((_, bar) => {
-      const { occurrence, pattern } = resolveArrangementOccurrence(composition, bar)
+    scheduledOccurrences.forEach((_, bar) => {
+      const { occurrence, pattern } = resolveArrangementOccurrence(scheduledComposition, bar)
+      // Repeat the selected written variation, retaining its original seed address.
+      const cycle = loop ? loop.start + bar % loop.occurrences.length : bar
       pattern.steps.forEach((step, index) => {
         const time = (stepCursor + index) * secondsPerStep
-        const resolved = resolveSequencerStep(composition, pattern, index, bar, fatigue.exhaustion, false, secondsPerStep, occurrence)
+        const resolved = resolveSequencerStep(composition, pattern, index, cycle, fatigue.exhaustion, false, secondsPerStep, occurrence)
         const eventTime = time + resolved.timingOffset
         const ratchetSpacing = secondsPerStep / resolved.ratchets
         const triggerTimes = Array.from({ length: resolved.ratchets }, (_, ratchet) => eventTime + ratchet * ratchetSpacing)
@@ -175,8 +183,14 @@ export async function renderCompositionToWav(composition: Composition): Promise<
     chords.release(stepCursor * secondsPerStep)
     signal.release(stepCursor * secondsPerStep)
     bass.release(stepCursor * secondsPerStep)
-  }, duration, 2, 44_100)
+  }, duration, 2, WAV_SAMPLE_RATE)
   const audioBuffer = rendered.get()
   if (!audioBuffer) throw new Error('Offline render produced no audio buffer.')
+  if (loop) {
+    const channels = extractLoopChannels(audioBuffer, Math.round(loop.warmupCycles * loop.seconds * WAV_SAMPLE_RATE), loop.frames)
+    const loopBuffer = new AudioBuffer({ length: loop.frames, numberOfChannels: channels.length, sampleRate: WAV_SAMPLE_RATE })
+    channels.forEach((channel, index) => loopBuffer.getChannelData(index).set(channel))
+    return encodeWav(loopBuffer, peakNormalizationGain(measurePeak(loopBuffer)))
+  }
   return encodeWav(audioBuffer, peakNormalizationGain(measurePeak(audioBuffer)))
 }

@@ -26,6 +26,8 @@ export function ProjectTools({ startCapture, stopCapture }: ProjectToolsProps) {
   const [projects, setProjects] = useState<SavedProject[]>([])
   const [snapshotName, setSnapshotName] = useState('')
   const [recording, setRecording] = useState(false)
+  const [loopStart, setLoopStart] = useState(1)
+  const [loopEnd, setLoopEnd] = useState<number | null>(null)
   const [rendering, setRendering] = useState(false)
   const [message, setMessage] = useState('Local autosave active')
   const importRef = useRef<HTMLInputElement>(null)
@@ -74,15 +76,15 @@ export function ProjectTools({ startCapture, stopCapture }: ProjectToolsProps) {
       setMessage('Live capture downloaded')
     }
   }
-  const renderWav = async () => {
+  const renderWav = async (loop = false) => {
     setRendering(true)
     setMessage('Rendering arrangement offline…')
     try {
-      const blob = await renderCompositionToWav(composition)
-      downloadBlob(blob, `${composition.id || 'violet-signal'}-arrangement.wav`)
-      setMessage('Offline WAV downloaded · normalized to −1 dBFS')
-    } catch {
-      setMessage('Offline rendering was not available in this browser')
+      const blob = await renderCompositionToWav(composition, loop ? { loop: { startOccurrence: loopStart - 1, endOccurrence: loopEnd ?? composition.arrangement.length } } : {})
+      downloadBlob(blob, `${composition.id || 'violet-signal'}-${loop ? 'loop' : 'arrangement'}.wav`)
+      setMessage(loop ? 'Loop WAV downloaded · enable whole-file looping in your game' : 'Offline WAV downloaded · normalized to −1 dBFS')
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'Offline rendering was not available in this browser')
     } finally {
       setRendering(false)
     }
@@ -101,6 +103,9 @@ export function ProjectTools({ startCapture, stopCapture }: ProjectToolsProps) {
       <input ref={importRef} className="sr-only" type="file" accept=".violet,.txt,text/plain" onChange={(event) => void importProject(event.target.files?.[0])} />
       <button type="button" className={recording ? 'is-recording' : ''} onClick={() => void toggleCapture()}><span className="capture-dot" /> {recording ? 'Stop capture' : 'Capture'}</button>
       <button type="button" disabled={rendering} title="Render the complete arrangement to a peak-normalized WAV file" onClick={() => void renderWav()}><FileMusic size={12} /> {rendering ? 'Rendering…' : 'WAV'}</button>
+      <label>Loop from <input type="number" aria-label="Loop first occurrence" min={1} max={composition.arrangement.length} value={loopStart} onChange={(event) => setLoopStart(Number(event.target.value))} style={{ width: '3.5em' }} /></label>
+      <label>to <input type="number" aria-label="Loop last occurrence" min={loopStart} max={composition.arrangement.length} value={loopEnd ?? composition.arrangement.length} onChange={(event) => setLoopEnd(Number(event.target.value))} style={{ width: '3.5em' }} /></label>
+      <button type="button" disabled={rendering} title="Export selected occurrences as an exact-length loop with warmed effect tails" onClick={() => void renderWav(true)}><FileMusic size={12} /> Loop WAV</button>
       {projects.length > 0 && <button type="button" className="snapshot-delete" title="Delete the newest snapshot" onClick={() => void deleteProject(projects[0].id).then(refresh)}><Trash2 size={11} /></button>}
       <output>{message}</output>
     </div>

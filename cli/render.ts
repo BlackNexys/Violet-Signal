@@ -1,3 +1,4 @@
+import type { WavRenderOptions } from '../src/audio/loopExport'
 import { createServer, type Server } from 'node:http'
 import { access, readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
@@ -104,7 +105,7 @@ async function closeServer(server: Server): Promise<void> {
   })
 }
 
-export async function renderCompositionFile(source: string, outputPath: string, inputPath: string): Promise<void> {
+export async function renderCompositionFile(source: string, outputPath: string, inputPath: string, options: WavRenderOptions = {}): Promise<void> {
   if (resolve(outputPath) === resolve(inputPath)) {
     throw new Error('The render output resolves to the input file. Choose a different output path.')
   }
@@ -123,11 +124,11 @@ export async function renderCompositionFile(source: string, outputPath: string, 
     const page = await context.newPage()
     await page.goto(url, { waitUntil: 'networkidle' })
     const [download] = await Promise.all([
-      page.waitForEvent('download'),
-      page.evaluate(async (notation) => {
-        const renderer = (globalThis as unknown as { violetRender(value: string): Promise<void> }).violetRender
-        await renderer(notation)
-      }, source),
+      page.waitForEvent('download', { timeout: 180_000 }),
+      page.evaluate(async ({ notation, options }) => {
+        const renderer = (globalThis as unknown as { violetRender(value: string, options: WavRenderOptions): Promise<void> }).violetRender
+        await renderer(notation, options)
+      }, { notation: source, options }),
     ])
     const failure = await download.failure()
     if (failure) throw new Error(failure)

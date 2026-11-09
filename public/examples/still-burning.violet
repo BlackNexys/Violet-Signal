@@ -1,0 +1,70 @@
+// Still Burning — Cole's theme sketch. Original editable example; optional Underworld pack.
+// 8 bars at 150 BPM, C minor. Export occurrences 1:4 with Loop WAV.
+scene "Still Burning" {
+  format-version: 4
+  style: darkwave
+  tempo: 150
+  meter: 4/4
+  steps: 32
+  seed: 1994
+  scale: C minor
+  lock: off
+  patterns: A B C D
+  active: A
+  arrangement: A B C D
+  patch signal: underworld/magenta-flame@1
+  patch bass: underworld/neon-drive@1
+  patch chords: underworld/afterlife@1
+  patch pulse: underworld/checkpoint@1
+  patch texture: underworld/cinder-hat@1
+  voice chords: triangle engine=subtractive octave=0 detune=0 layer-level=-2 character=0.2 attack-scale=1 release-scale=1 filter=lowpass cutoff=2700 resonance=0.5 glide=0 volume=-14 attack=0.09 decay=0.4 sustain=0.65 release=0.85 send-fracture=1 send-veil=1 send-memory=1 send-environment=1 mute=off solo=off
+  layer chords shadow: on engine=fm waveform=sine octave=1 detune=0 level=-19 character=0.143 attack-scale=1.5 release-scale=1
+  voice signal: sine engine=fm octave=0 detune=0 layer-level=0 character=0.429 attack-scale=1 release-scale=1 filter=lowpass cutoff=6400 resonance=0.7 glide=0.018 volume=-10 attack=0.006 decay=0.18 sustain=0.62 release=0.12 send-fracture=0.25 send-veil=0.5 send-memory=0.55 send-environment=0.4 mute=off solo=off
+  layer signal shadow: on engine=subtractive waveform=square octave=1 detune=0 level=-25 character=0.1 attack-scale=1 release-scale=1
+  voice bass: sine engine=fm octave=0 detune=0 layer-level=0 character=0.143 attack-scale=1 release-scale=1 filter=lowpass cutoff=1900 resonance=1.1 glide=0 volume=-8 attack=0.005 decay=0.14 sustain=0.25 release=0.07 send-fracture=0.2 send-veil=0 send-memory=0.05 send-environment=0.08 mute=off solo=off
+  layer bass shadow: on engine=subtractive waveform=sine octave=-1 detune=0 level=-14 character=0.08 attack-scale=1 release-scale=1
+  voice pulse: sine engine=membrane octave=0 detune=0 layer-level=0 character=0.28 attack-scale=1 release-scale=1 filter=lowpass cutoff=2600 resonance=0.7 glide=0 volume=-9 attack=0.005 decay=0.09 sustain=0 release=0.045 send-fracture=0.15 send-veil=0 send-memory=0 send-environment=0.1 mute=off solo=off
+  layer pulse shadow: on engine=metal waveform=square octave=0 detune=0 level=-26 character=0.15 attack-scale=1 release-scale=0.5
+  voice texture: square engine=noise octave=0 detune=0 layer-level=0 character=0.25 attack-scale=1 release-scale=1 filter=highpass cutoff=5100 resonance=0.6 glide=0 volume=-13 attack=0.005 decay=0.035 sustain=0 release=0.03 send-fracture=0.05 send-veil=0 send-memory=0.1 send-environment=0.15 mute=off solo=off
+  layer texture shadow: off engine=noise waveform=sawtooth octave=0 detune=0 level=-18 character=0.28 attack-scale=1 release-scale=1
+  memory: 0.18
+  environment: 0.28
+  veil: 0.08
+  fracture: 0.04
+  ghost: 0
+  humanize: 0
+  overclock: 0
+  output: -9
+
+  // A: rising flame, falling answer. The Eb against C keeps the hook wistful.
+  notes A: 01=C4+Eb4+G4~8 09=C4+Eb4+G4~8 17=Ab3+C4+Eb4~8 25=Ab3+C4+Eb4~8
+  signal A: 01=G5~2 04=Eb5 05=G5~2 07=Bb5~2 09=C6~3 13=Bb5~2 15=G5 17=Eb5~3 21=C5~2 23=Eb5~2 25=G5~3 29=Eb5~2 31=F5
+  bass A: 01=C2 03=C3 05=C2 07=G2 09=C2 11=C3 13=Bb2 15=G2 17=Ab1 19=Ab2 21=Ab1 23=Eb2 25=Ab1 27=Ab2 29=Bb1 31=Eb2
+  pulse A: 01 07 09 15 17 23 25 29
+  texture A: 03 05 07 11 13 15 19 21 23 27 29 31
+  emphasis A: 01=0.9 05=1 09=0.85 13=1 17=0.9 21=1 25=0.85 29=1
+
+  // B: the answer opens toward Eb major, then reaches back into Bb.
+  notes B: 01=Bb3+Eb4+G4~8 09=Bb3+Eb4+G4~8 17=Bb3+D4+F4~8 25=Bb3+D4+F4~8
+  signal B: 01=G5~2 04=F5 05=Eb5~2 07=G5~2 09=Bb5~3 13=G5~2 15=F5 17=D5~2 20=F5 21=Bb5~2 23=A5 25=F5~3 29=D5~2 31=F5
+  bass B: 01=Eb2 03=Eb3 05=Eb2 07=Bb2 09=Eb2 11=Eb3 13=D2 15=Bb1 17=Bb1 19=Bb2 21=Bb1 23=F2 25=Bb1 27=Bb2 29=D2 31=F2
+  pulse B: 01 07 09 15 17 23 25 29
+  texture B: 03 05 07 11 13 15 19 21 23 27 29 31
+  emphasis B: 01=0.9 05=1 09=0.85 13=1 17=0.9 21=1 25=0.85 29=1
+
+  // C: insistence and a higher reply — Cole keeps moving.
+  notes C: 01=C4+Eb4+G4~8 09=C4+Eb4+G4~8 17=Ab3+C4+Eb4~8 25=Ab3+C4+Eb4~8
+  signal C: 01=C6~2 03=G5 05=Bb5~2 07=G5 09=Eb5~2 11=G5 13=C6~3 17=Eb6~3 21=C6~2 23=Bb5~2 25=G5~3 29=Eb5~2 31=G5
+  bass C: 01=C2 03=C3 05=C2 07=G2 09=C2 11=C3 13=Bb2 15=G2 17=Ab1 19=Ab2 21=Ab1 23=Eb2 25=Ab1 27=Ab2 29=Bb1 31=Eb2
+  pulse C: 01 07 09 15 17 23 25 29
+  texture C: 03 05 07 11 13 15 19 21 23 27 29 31
+  emphasis C: 01=0.95 05=1 09=0.85 13=1 17=0.95 21=1 25=0.85 29=1
+
+  // D: F minor into G major; B natural pulls back to the opening C minor.
+  notes D: 01=Ab3+C4+F4~8 09=Ab3+C4+F4~8 17=B3+D4+G4~8 25=B3+D4+G4~8
+  signal D: 01=Ab5~3 05=G5~2 07=F5~2 09=C6~3 13=Ab5~2 15=F5 17=G5~2 19=D5 21=G5~2 23=Ab5 25=G5~2 27=F5 29=D5~2 31=B4
+  bass D: 01=F2 03=F3 05=F2 07=C3 09=F2 11=F3 13=Eb2 15=C2 17=G1 19=G2 21=G1 23=D2 25=G1 27=G2 29=B1 31=D2
+  pulse D: 01 07 09 15 17 23 25 29 31
+  texture D: 03 05 07 11 13 15 19 21 23 27 29 31 32
+  emphasis D: 01=0.9 05=1 09=0.85 13=1 17=0.9 21=1 25=0.85 29=1 31=0.8 32=0.65
+}

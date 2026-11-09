@@ -239,6 +239,19 @@ try {
   for (let offset = 44; offset + 1 < wavBytes.length; offset += 2) wavPeak = Math.max(wavPeak, Math.abs(wavBytes.readInt16LE(offset)) / 32768)
   expect(wavPeak >= 0.885 && wavPeak <= 0.895, `normalized WAV peak was ${wavPeak.toFixed(4)} instead of -1 dBFS`)
 
+  await page.locator('input[type="file"]').setInputFiles('public/examples/still-burning.violet')
+  await page.getByText('Imported Still Burning', { exact: true }).waitFor()
+  await page.getByLabel('Voice controls').getByRole('button', { name: 'Signal', exact: true }).click()
+  expect(await soundPatch.inputValue() === 'underworld/magenta-flame@1', 'retro example lost its FM lead patch')
+  await page.getByRole('spinbutton', { name: 'Loop first occurrence' }).fill('2')
+  await page.getByRole('spinbutton', { name: 'Loop last occurrence' }).fill('3')
+  const loopDownload = page.waitForEvent('download', { timeout: 120_000 })
+  await page.getByRole('button', { name: 'Loop WAV', exact: true }).click()
+  const loopWav = await loopDownload
+  expect(loopWav.suggestedFilename().endsWith('-loop.wav'), 'loop export filename is ambiguous')
+  const loopBytes = await readFile(await loopWav.path())
+  expect(loopBytes.length === 44 + Math.round(2 * 32 * 60 / 150 / 4 * 44100) * 4, 'UI loop selection did not reach the renderer')
+
   await mkdir('artifacts', { recursive: true })
   await page.screenshot({ path: 'artifacts/violet-signal-desktop.png', fullPage: true })
 

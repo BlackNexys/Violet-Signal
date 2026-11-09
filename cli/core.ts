@@ -1,3 +1,4 @@
+import type { WavRenderOptions } from '../src/audio/loopExport'
 import { parseComposition } from '../src/dsl/parser'
 import { serializeComposition } from '../src/dsl/serializer'
 
@@ -14,7 +15,7 @@ export interface CliDiagnostic {
 export interface CliIo {
   readFile(path: string): Promise<string>
   writeFile(path: string, contents: string): Promise<void>
-  renderFile(source: string, outputPath: string, inputPath: string): Promise<void>
+  renderFile(source: string, outputPath: string, inputPath: string, options?: WavRenderOptions): Promise<void>
   stdout(contents: string): void
   stderr(contents: string): void
 }
@@ -32,6 +33,7 @@ interface ParsedOptions {
   check: boolean
   write: boolean
   output?: string
+  loop?: { startOccurrence: number; endOccurrence: number }
 }
 
 export const CLI_HELP = `Violet Signal notation tools
@@ -39,7 +41,8 @@ export const CLI_HELP = `Violet Signal notation tools
 Usage:
   violet validate <input.violet> [--json]
   violet format <input.violet> [--check | --write] [--json]
-  violet render <input.violet> --out <output.wav> [--json]
+  violet render <input.violet> --out <output.wav> [--loop <first:last>] [--json]
+  # --loop uses one-based inclusive arrangement occurrences (e.g. 1:8).
   violet --help
   violet --version
 
@@ -76,6 +79,7 @@ function parseOptions(command: 'validate' | 'format' | 'render', args: string[])
   let json = false
   let check = false
   let write = false
+  let loop: ParsedOptions['loop']
   let output: string | undefined
 
   for (let index = 0; index < args.length; index += 1) {
@@ -83,6 +87,13 @@ function parseOptions(command: 'validate' | 'format' | 'render', args: string[])
     if (argument === '--json') json = true
     else if (command === 'format' && argument === '--check') check = true
     else if (command === 'format' && argument === '--write') write = true
+    else if (command === 'render' && argument === '--loop') {
+      const match = /^(\d+):(\d+)$/.exec(args[++index] ?? '')
+      if (!match || Number(match[1]) < 1 || Number(match[2]) < Number(match[1])) {
+        return { code: 'VIOLET_USAGE', message: 'Use --loop first:last with one-based inclusive arrangement occurrences.' }
+      }
+      loop = { startOccurrence: Number(match[1]) - 1, endOccurrence: Number(match[2]) }
+    }
     else if (command === 'render' && argument === '--out') {
       const value = args[index + 1]
       if (!value || value.startsWith('-')) {
@@ -102,7 +113,7 @@ function parseOptions(command: 'validate' | 'format' | 'render', args: string[])
   if (check && write) return { code: 'VIOLET_USAGE', message: 'Choose either --check or --write, not both.' }
   if (command === 'render' && !output) return { code: 'VIOLET_USAGE', message: 'Render requires --out <output.wav>.' }
   if (command === 'render' && output === file) return { code: 'VIOLET_USAGE', message: 'The render output must differ from the input file.' }
-  return { file, json, check, write, output }
+  return { file, json, check, write, output, loop }
 }
 
 async function loadCanonicalFile(
@@ -196,7 +207,8 @@ async function render(options: ParsedOptions, io: CliIo): Promise<CliExitCode> {
 
   const output = options.output as string
   try {
-    await io.renderFile(loaded.canonical, output, options.file)
+    if (options.loop) await io.renderFile(loaded.canonical, output, options.file, { loop: options.loop })
+    else await io.renderFile(loaded.canonical, output, options.file)
   } catch (error) {
     return reportFailure(io, {
       code: 'VIOLET_RENDER_ERROR',

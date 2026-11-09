@@ -31,6 +31,19 @@ function harness(initialFiles: Record<string, string> = {}) {
 const canonical = `${serializeComposition(makeEmptyComposition())}\n`
 
 describe('Violet CLI', () => {
+  it('passes inclusive loop boundaries to the renderer as a zero-based range', async () => {
+    const test = harness({ 'signal.violet': canonical })
+    let received: unknown
+    test.io.renderFile = async (_source, _output, _input, options) => { received = options }
+    expect(await runCli(['render', 'signal.violet', '--out', 'loop.wav', '--loop', '2:4'], test.io, '0.1.0')).toBe(0)
+    expect(received).toEqual({ loop: { startOccurrence: 1, endOccurrence: 4 } })
+  })
+
+  it.each(['0:4', '4:2', '1.5:4', 'bad'])('rejects malformed loop range %s', async (range) => {
+    const test = harness({ 'signal.violet': canonical })
+    expect(await runCli(['render', 'signal.violet', '--out', 'loop.wav', '--loop', range], test.io, '0.1.0')).toBe(2)
+    expect(test.renders).toEqual([])
+  })
   it('validates canonical notation', async () => {
     const test = harness({ 'signal.violet': canonical })
 

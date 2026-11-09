@@ -30,6 +30,8 @@ Global and step-addressed Fracture, Veil, and Memory values shape the shared pro
 
 WAV output is stereo, 44.1 kHz, 16-bit PCM. After rendering, the highest absolute PCM sample is normalized to `−1 dBFS`. Silence is left untouched. This removes accidental playback-level differences while retaining the balance, dynamics, distortion, limiting, and effect interaction created before the normalization stage.
 
+Optional loop export accepts explicit arrangement boundaries, warms repeated occurrences through the same graph, and extracts an exact-length cycle with a five-millisecond seam crossfade. It preserves the original occurrence addresses for seeded event decisions and normalizes after extraction. The regular arrangement export retains its four-second tail. See [retro soundtracks](retro-soundtracks.md) for UI/CLI usage, tail handling, render cost, and limits; separate intro/loop and stem export remain deferred.
+
 Peak normalization is not full mastering or LUFS normalization. Material with very sharp transients can still sound quieter than heavily compressed commercial music even when both peak at `−1 dBFS`.
 
 The WAV represents the written composition. Temporary live gestures such as Pressure and Freeze Memory are intentionally excluded; use live WebM capture when those gestures are part of the performance.

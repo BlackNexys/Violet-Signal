@@ -7,9 +7,9 @@ import { runCli, type CliIo } from './core'
 const io: CliIo = {
   readFile: (path) => readFile(path, 'utf8'),
   writeFile: (path, contents) => writeFile(path, contents, 'utf8'),
-  renderFile: async (source, outputPath, inputPath) => {
+  renderFile: async (source, outputPath, inputPath, options) => {
     const { renderCompositionFile } = await import('./render')
-    await renderCompositionFile(source, outputPath, inputPath)
+    await renderCompositionFile(source, outputPath, inputPath, options)
   },
   stdout: (contents) => process.stdout.write(contents),
   stderr: (contents) => process.stderr.write(contents),

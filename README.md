@@ -192,3 +192,7 @@ The audio graph is created only after a user gesture. A shared source factory bu
 ## Next valuable milestone
 
 Complete the remaining Fractured Relay and Low Cinema patch content, now with Signal available as a dedicated lead role. The completed expansion sequence is maintained in [`notes/instrument-sound-and-layer-expansion-plan.md`](notes/instrument-sound-and-layer-expansion-plan.md).
+
+## Retro game soundtracks
+
+The optional Underworld pack and editable **Still Burning** theme demonstrate FM lead/bass, warm pads, and retro percussion. Import [the example](public/examples/still-burning.violet), edit its lanes, and use **Loop WAV** for a game-ready whole-file loop. See [the soundtrack guide](project-notes/retro-soundtracks.md) for export commands, loop behavior, architecture findings, and limitations.

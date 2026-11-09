@@ -29,6 +29,11 @@ export interface SoundPackDefinition {
 
 export const SOUND_PACKS: SoundPackDefinition[] = [
   {
+    id: 'underworld', version: 1, label: 'Underworld',
+    description: 'Optional retro game voices: bright FM fire, driving bass, spectral warmth, and compact machine drums.',
+    tags: ['retro', 'game', 'fm'],
+  },
+  {
     id: 'blacklight-core',
     version: 1,
     label: 'Blacklight Core',
@@ -73,6 +78,30 @@ function definePatch(
 }
 
 export const INSTRUMENT_PATCHES: InstrumentPatchDefinition[] = [
+  definePatch('underworld', 'magenta-flame', 'Magenta Flame', 'Expressive FM lead with a quiet pulse octave', ['retro', 'lead', 'bright'], 'signal', {
+    cutoff: 6400, attack: 0.006, decay: 0.18, sustain: 0.62, release: 0.12, glide: 0.018, volume: -10,
+    primary: { engine: 'fm', waveform: 'sine', character: 0.429, level: 0 },
+    shadow: { enabled: true, engine: 'subtractive', waveform: 'square', octave: 1, level: -25, character: 0.1 },
+  }),
+  definePatch('underworld', 'neon-drive', 'Neon Drive', 'Punchy FM bass with a sine sub foundation', ['retro', 'bass', 'punchy'], 'bass', {
+    cutoff: 1900, resonance: 1.1, attack: 0.005, decay: 0.14, sustain: 0.25, release: 0.07, glide: 0, volume: -8,
+    primary: { engine: 'fm', waveform: 'sine', character: 0.143, level: 0 },
+    shadow: { enabled: true, engine: 'subtractive', waveform: 'sine', octave: -1, level: -14, character: 0.08 },
+  }),
+  definePatch('underworld', 'afterlife', 'Afterlife', 'Warm triangle pad with a faint glass harmonic', ['retro', 'pad', 'spectral'], 'chords', {
+    cutoff: 2700, resonance: 0.5, attack: 0.09, decay: 0.4, sustain: 0.65, release: 0.85, volume: -14,
+    primary: { engine: 'subtractive', waveform: 'triangle', level: -2, character: 0.2 },
+    shadow: { enabled: true, engine: 'fm', waveform: 'sine', octave: 1, level: -19, character: 0.143, attackScale: 1.5 },
+  }),
+  definePatch('underworld', 'checkpoint', 'Checkpoint', 'Compact membrane kick with a clipped metallic edge', ['retro', 'drum', 'kick'], 'pulse', {
+    cutoff: 2600, attack: 0.005, decay: 0.09, sustain: 0, release: 0.045, volume: -9,
+    primary: { engine: 'membrane', waveform: 'sine', character: 0.28, level: 0 },
+    shadow: { enabled: true, engine: 'metal', waveform: 'square', level: -26, character: 0.15, releaseScale: 0.5 },
+  }),
+  definePatch('underworld', 'cinder-hat', 'Cinder Hat', 'Short high-passed noise hat for a tracker backbeat', ['retro', 'drum', 'noise'], 'texture', {
+    cutoff: 5100, filterType: 'highpass', resonance: 0.6, attack: 0.005, decay: 0.035, sustain: 0, release: 0.03, volume: -13,
+    primary: { engine: 'noise', waveform: 'square', level: 0, character: 0.25 },
+  }),
   definePatch('blacklight-core', 'quiet-circuit', 'Quiet Circuit', 'Classic filtered poly synth', ['clear', 'soft', 'balanced'], 'chords', {
     core: 'triangle', cutoff: 2800, resonance: 0.7, attack: 0.05, decay: 0.38, sustain: 0.58, release: 1.4, volume: -10,
   }),

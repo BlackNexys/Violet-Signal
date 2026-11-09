@@ -53,6 +53,7 @@ The first registry contains:
 - **Veil Archive** — Glass Choir combines an AM Primary with a quiet octave-up FM Shadow; Undertow combines a sine subtractive bass with a restrained FM Shadow; Cold Beacon gives Signal a glassy AM/FM lead.
 - **Chrome Wound** — Razor Assembly and Reactor use dual oscillators; Iron Pulse and Arc Ash combine membrane, metal, and noise layers.
 - **Fractured Relay** — Wire Below provides a managed physical-pluck bass; Needle Light gives Signal a plucked lead; Relay Click provides a clipped metallic transient.
+- **Underworld** — Optional retro game voices: Magenta Flame FM lead, Neon Drive FM/sub bass, Afterlife pad, Checkpoint kick, and Cinder Hat noise percussion. See the [soundtrack guide](retro-soundtracks.md) and editable Still Burning example. Existing registry entries retain their settings and identities.
 
 Patch ids use `pack-id/patch-id@version`. Applying a patch copies its complete sound settings into the composition while preserving that voice's four effect sends. Playback never requires a registry lookup, so a future pack revision cannot silently alter an existing project. Changing a sound-defining layer, filter, envelope, or channel value clears provenance to **Custom**; routing sends, mute, and solo do not.
 
