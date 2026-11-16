@@ -71,7 +71,7 @@ function LayerEditor({ layer, projectMs, onChange }: {
           ['filterHz', 'Filter', 'hertz'],
           ['levelDb', 'Level', 'decibels'],
           ['bits', 'Fracture', 'bit depth'],
-        ] as const).map(([key, label, conventional]) => (
+        ] as const).filter(([key]) => layer.engine !== 'noise' || (key !== 'frequency' && key !== 'endFrequency')).map(([key, label, conventional]) => (
           <ControlSlider key={key} label={label} conventional={conventional} value={layer[key]}
             min={ranges[key][0]}
             max={key === 'startMs' ? projectMs - 10 :
@@ -146,12 +146,12 @@ export function FxLab() {
   const audition = async (rapid: boolean) => {
     stopPreview()
     // Create / resume the output on the user's gesture before the async offline render.
-    const context = audioRef.current && audioRef.current.state !== 'closed'
-      ? audioRef.current : new AudioContext()
-    audioRef.current = context
     const version = previewVersion.current
     setBusy(true)
     try {
+      const context = audioRef.current && audioRef.current.state !== 'closed'
+        ? audioRef.current : new AudioContext()
+      audioRef.current = context
       const [buffer] = await Promise.all([renderFxAudio(project), context.resume()])
       if (version !== previewVersion.current) return
       const start = context.currentTime + 0.02
