@@ -70,7 +70,7 @@ export default function App() {
           </div>
         </div>
 
-        <div className="scene-picker">
+        {workspace === 'composer' && <div className="scene-picker">
           <label htmlFor="scene-select">Scene</label>
           <select id="scene-select" value={currentSceneId} onChange={(event) => loadScene(event.target.value)}>
             {currentSceneId === 'custom' && <option value="custom">Custom project</option>}
@@ -78,9 +78,9 @@ export default function App() {
           </select>
           <p className="scene-world"><strong>{worldProfile.label}</strong><span>{worldProfile.description}</span></p>
           <button type="button" className="style-lab-launch" onClick={() => setStyleLabOpen(true)}><Sparkles size={13} /> Style Lab</button>
-        </div>
+        </div>}
 
-        <div className="transport" aria-label="Transport controls">
+        {workspace === 'composer' && <div className="transport" aria-label="Transport controls">
           {!audioReady && (
             <button type="button" className="enable-audio" onClick={() => void enable()}>
               <Headphones size={15} /> Enable audio
@@ -97,12 +97,12 @@ export default function App() {
             <i />
             <span>{isPlaying ? `Playing · ${String(activeStep + 1).padStart(2, '0')}` : audioReady ? 'Audio ready' : 'Audio asleep'}</span>
           </div>
-        </div>
+        </div>}
 
-        <div className="header-parameters">
+        {workspace === 'composer' && <div className="header-parameters">
           <ControlSlider label="Tempo" conventional="Beats per minute" value={composition.bpm} min={40} max={180} step={1} format={(value) => `${value} bpm`} onChange={(value) => updateRoot('bpm', value)} />
           <ControlSlider label="Output" conventional="Master volume" value={composition.masterVolume} min={-36} max={-6} step={1} format={(value) => `${value} dB`} onChange={(value) => updateRoot('masterVolume', value)} />
-        </div>
+        </div>}
       </header>
 
       <div className="utility-row">
@@ -116,14 +116,14 @@ export default function App() {
             <Zap size={14} /> FX Lab
           </button>
         </div>
-        <p><AudioLines size={14} /> {composition.scaleRoot} {composition.scaleMode} · seed {composition.seed} {pending && <em>· change queued</em>}</p>
-        <div>
+        {workspace === 'composer' && <p><AudioLines size={14} /> {composition.scaleRoot} {composition.scaleMode} · seed {composition.seed} {pending && <em>· change queued</em>}</p>}
+        {workspace === 'composer' && <div>
           <LearningCenter onViewChange={setActiveTab} />
           <button type="button" className="text-button" disabled={!historyCount} onClick={undo}><Undo2 size={14} /> Undo</button>
           <button type="button" className="text-button" disabled={!futureCount} onClick={redo}><Redo2 size={14} /> Redo</button>
           <button type="button" className="text-button" onClick={resetScene}><RotateCcw size={14} /> Reset scene</button>
           <button type="button" className="text-button panic-button" title="Silence every voice and reset the audio transport" onClick={panic}><ShieldAlert size={14} /> Panic</button>
-        </div>
+        </div>}
       </div>
 
       {workspace === 'composer' && <ProjectTools startCapture={startCapture} stopCapture={stopCapture} />}
@@ -147,9 +147,9 @@ export default function App() {
       </main>}
 
       <footer className="statusbar">
-        <span><i className={audioReady ? 'status-ok' : ''} /> Audio begins only after your gesture</span>
+        <span>{workspace === 'composer' ? <><i className={audioReady ? 'status-ok' : ''} /> Audio begins only after your gesture</> : 'FX Lab · previews start only after pressing Audition'}</span>
         <span>{workspace === 'composer' ? '4 patterns · 5 voices · safe limiter −1 dB' : '3 one-shot layers · .violetfx · WAV'}</span>
-        <span>IndexedDB autosave · no code execution</span>
+        <span>{workspace === 'composer' ? 'IndexedDB autosave · no code execution' : 'Save editable FX projects locally · no automatic autosave'}</span>
       </footer>
       {workspace === 'composer' && <StyleBrowser open={styleLabOpen} onClose={closeStyleLab} />}
     </div>
