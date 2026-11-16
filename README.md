@@ -6,6 +6,12 @@ This version expands the original one-bar MVP into a compact composition tool wh
 
 The visual direction is defined in [`project-notes/blacklight-style-guide.md`](project-notes/blacklight-style-guide.md): a “haunted precision” system that translates the reference imagery into accessible interface color, type, hierarchy, state, material, and motion rules.
 
+## Design game sounds in FX Lab (experimental)
+
+Use the **Composer / FX Lab** switch in the top utility row to open a separate one-shot sound editor. FX Lab has three editable synthesis layers (transient, body, tail), millisecond starts/lengths, pitch sweeps, filters, fracture bit depth, independent level controls, single-shot and five-shots-per-second audition, editable `.violetfx` import/export, and unnormalized 44.1 kHz WAV output. It ships with a short Flicker-style example; the feature is generic, not tied to Underworld runtime.
+
+The Composer continues to use the existing `.violet` v4 format. FX Lab uses a **different** project format and does not alter song projects, arrangement controls or music WAV export. For design details, supported ranges, and review steps, see [FX Lab documentation](src/fx/README.md).
+
 ## Learn inside the instrument
 
 Use **Tutorial** for a seven-step guided walkthrough that points to the real transport, sequencer, keyboard, voice controls, patterns, code, and project tools. It automatically opens the relevant workspace view on narrow screens and can be replayed at any time.
