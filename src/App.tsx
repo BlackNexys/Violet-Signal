@@ -12,6 +12,7 @@ import {
   RotateCcw,
   ShieldAlert,
   Sparkles,
+  Zap,
   SlidersHorizontal,
   Undo2,
 } from 'lucide-react'
@@ -19,6 +20,7 @@ import { useAudioEngine } from './audio/useAudioEngine'
 import { CodePanel } from './components/CodePanel'
 import { ControlSlider } from './components/ControlSlider'
 import { InstrumentPanel } from './components/InstrumentPanel'
+import { FxLab } from './components/FxLab'
 import { LearningCenter } from './components/LearningCenter'
 import { ProjectTools } from './components/ProjectTools'
 import { SequencerPanel } from './components/SequencerPanel'
@@ -32,6 +34,7 @@ type WorkspaceTab = 'instrument' | 'sequence' | 'code'
 export default function App() {
   const [activeTab, setActiveTab] = useState<WorkspaceTab>('sequence')
   const [styleLabOpen, setStyleLabOpen] = useState(false)
+  const [workspace, setWorkspace] = useState<'composer' | 'fx'>('composer')
   const closeStyleLab = useCallback(() => setStyleLabOpen(false), [])
   const composition = useAppStore((state) => state.composition)
   const currentSceneId = useAppStore((state) => state.currentSceneId)
@@ -50,6 +53,11 @@ export default function App() {
   const setRecordArmed = useAppStore((state) => state.setRecordArmed)
   const { enable, play, pause, stop, panic, audition, startCapture, stopCapture } = useAudioEngine()
   const worldProfile = getStyle(composition.world)
+  const switchWorkspace = (next: 'composer' | 'fx') => {
+    if (next === workspace) return
+    if (next === 'fx') stop()
+    setWorkspace(next)
+  }
 
   return (
     <div className="app-shell">
@@ -98,6 +106,16 @@ export default function App() {
       </header>
 
       <div className="utility-row">
+        <div className="workspace-selector" role="group" aria-label="Violet Signal workspace">
+          <button type="button" className={workspace === 'composer' ? 'is-active' : ''}
+            aria-pressed={workspace === 'composer'} onClick={() => switchWorkspace('composer')}>
+            <AudioLines size={14} /> Composer
+          </button>
+          <button type="button" className={workspace === 'fx' ? 'is-active' : ''}
+            aria-pressed={workspace === 'fx'} onClick={() => switchWorkspace('fx')}>
+            <Zap size={14} /> FX Lab
+          </button>
+        </div>
         <p><AudioLines size={14} /> {composition.scaleRoot} {composition.scaleMode} · seed {composition.seed} {pending && <em>· change queued</em>}</p>
         <div>
           <LearningCenter onViewChange={setActiveTab} />
@@ -108,15 +126,15 @@ export default function App() {
         </div>
       </div>
 
-      <ProjectTools startCapture={startCapture} stopCapture={stopCapture} />
+      {workspace === 'composer' && <ProjectTools startCapture={startCapture} stopCapture={stopCapture} />}
 
-      <nav className="mobile-tabs" aria-label="Workspace views">
+      {workspace === 'composer' && <nav className="mobile-tabs" aria-label="Workspace views">
         <button type="button" className={activeTab === 'instrument' ? 'is-active' : ''} onClick={() => setActiveTab('instrument')}><SlidersHorizontal size={15} /> Instrument</button>
         <button type="button" className={activeTab === 'sequence' ? 'is-active' : ''} onClick={() => setActiveTab('sequence')}><Grid3X3 size={15} /> Sequence</button>
         <button type="button" className={activeTab === 'code' ? 'is-active' : ''} onClick={() => setActiveTab('code')}><Code2 size={15} /> Code</button>
-      </nav>
+      </nav>}
 
-      <main className="workspace">
+      {workspace === 'fx' ? <main className="fx-workspace"><FxLab /></main> : <main className="workspace">
         <div className={activeTab === 'instrument' ? 'panel-slot is-mobile-active' : 'panel-slot'}>
           <InstrumentPanel audition={(note) => void audition(note)} />
         </div>
@@ -126,14 +144,14 @@ export default function App() {
         <div className={activeTab === 'code' ? 'panel-slot is-mobile-active' : 'panel-slot'}>
           <CodePanel />
         </div>
-      </main>
+      </main>}
 
       <footer className="statusbar">
         <span><i className={audioReady ? 'status-ok' : ''} /> Audio begins only after your gesture</span>
-        <span>4 patterns · 5 voices · safe limiter −1 dB</span>
+        <span>{workspace === 'composer' ? '4 patterns · 5 voices · safe limiter −1 dB' : '3 one-shot layers · .violetfx · WAV'}</span>
         <span>IndexedDB autosave · no code execution</span>
       </footer>
-      <StyleBrowser open={styleLabOpen} onClose={closeStyleLab} />
+      {workspace === 'composer' && <StyleBrowser open={styleLabOpen} onClose={closeStyleLab} />}
     </div>
   )
 }
